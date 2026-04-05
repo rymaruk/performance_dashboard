@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  /* Blue (primary) */
+  --color-primary-50: #E3F2FD;
+  --color-primary-100: #BBDEFB;
+  --color-primary-200: #90CAF9;
+  --color-primary-500: #2196F3;
+  --color-primary-600: #1E88E5;
+  --color-primary-700: #1976D2;
+  --color-primary-900: #0D47A1;
+
+  /* Green */
+  --color-green-50: #E8F5E9;
+  --color-green-100: #C8E6C9;
+  --color-green-500: #4CAF50;
+  --color-green-700: #388E3C;
+  --color-green-900: #1B5E20;
+
+  /* Orange */
+  --color-orange-50: #FFF3E0;
+  --color-orange-100: #FFE0B2;
+  --color-orange-500: #FF9800;
+  --color-orange-700: #F57C00;
+  --color-orange-900: #E65100;
+
+  /* Purple */
+  --color-purple-50: #F3E5F5;
+  --color-purple-100: #E1BEE7;
+  --color-purple-500: #9C27B0;
+  --color-purple-700: #7B1FA2;
+  --color-purple-900: #4A148C;
+
+  /* Red */
+  --color-red-50: #FFEBEE;
+  --color-red-100: #FFCDD2;
+  --color-red-500: #F44336;
+  --color-red-600: #E53935;
+  --color-red-700: #D32F2F;
+
+  /* Teal */
+  --color-teal-50: #E0F2F1;
+  --color-teal-500: #009688;
+  --color-teal-700: #00796B;
+
+  /* Gray */
+  --color-gray-50: #FAFAFA;
+  --color-gray-100: #F5F5F5;
+  --color-gray-200: #EEEEEE;
+  --color-gray-300: #E0E0E0;
+  --color-gray-400: #BDBDBD;
+  --color-gray-500: #9E9E9E;
+  --color-gray-600: #757575;
+  --color-gray-700: #616161;
+  --color-gray-800: #424242;
+  --color-gray-900: #212121;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+#root { min-height: 100vh; }
+
+/* react-datepicker inline tooltip overrides */
+.dp-tooltip-cal {
+  font-size: 12px !important;
+  border: none !important;
+  font-family: var(--font-sans) !important;
+}
+.dp-tooltip-cal .react-datepicker__header {
+  background: var(--color-gray-100) !important;
+  border-bottom: 1px solid var(--color-gray-300) !important;
+  padding-top: 8px !important;
+}
+.dp-tooltip-cal .react-datepicker__current-month {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: var(--color-gray-900) !important;
+}
+.dp-tooltip-cal .react-datepicker__day-name {
+  font-size: 10px !important;
+  color: var(--color-gray-500) !important;
+  width: 28px !important;
+  line-height: 28px !important;
+}
+.dp-tooltip-cal .react-datepicker__day {
+  width: 28px !important;
+  line-height: 28px !important;
+  font-size: 11px !important;
+  border-radius: 6px !important;
+  margin: 1px !important;
+}
+.dp-tooltip-cal .react-datepicker__day--selected {
+  background: var(--color-primary-700) !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+}
+.dp-tooltip-cal .react-datepicker__day:hover {
+  background: var(--color-primary-50) !important;
+}
+.dp-tooltip-cal .react-datepicker__day--disabled {
+  color: var(--color-gray-300) !important;
+}
+.dp-tooltip-cal .react-datepicker__navigation {
+  top: 8px !important;
+}
