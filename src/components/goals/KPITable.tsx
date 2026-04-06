@@ -100,8 +100,11 @@ export function KPITable({
         </ItemActions>
       </Item>
 
-      {kpis.length > 0 &&
-        kpis.map((k) => {
+      {kpis.length > 0 && (
+        <div
+          className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(min(100%,max(12rem,calc((100%-1rem)/3))),1fr))]"
+        >
+          {kpis.map((k) => {
           const kac = getAccentDef(k.color ?? goalColor);
           const pct = k.target
             ? Math.min(100, Math.round((k.current / k.target) * 100))
@@ -109,7 +112,7 @@ export function KPITable({
           const isComplete = k.current >= k.target;
 
           return (
-            <Item key={k.id} variant="outline" size="sm" className="mb-1.5 items-start">
+            <Item key={k.id} variant="outline" size="sm" className="items-start h-full min-w-0">
               <ItemMedia variant="icon" className="mt-0.5 size-7 [&_svg]:size-3.5">
                 <div
                   className={cn(
@@ -146,51 +149,53 @@ export function KPITable({
                   </Tooltip>
                 </div>
 
-                <FieldGroup className="grid grid-cols-3 gap-3">
-                  <Field>
-                    <FieldLabel
-                      htmlFor={`kpi-current-${k.id}`}
-                      className="text-[10px] text-muted-foreground"
-                    >
-                      Поточне
-                    </FieldLabel>
-                    <Input
-                      id={`kpi-current-${k.id}`}
-                      type="number"
-                      value={k.current}
-                      onChange={(e) =>
-                        onUpdate(k.id, (kk) => ({
-                          ...kk,
-                          current: Number(e.target.value) || 0,
-                        }))
-                      }
-                      className={cn(
-                        "h-7 text-xs font-bold px-2",
-                        isComplete ? "text-success" : kac.text,
-                      )}
-                    />
-                  </Field>
+                <FieldGroup className="grid gap-2 space-y-0">
+                  <div className="grid grid-cols-2 gap-2 min-w-0">
+                    <Field className="min-w-0 gap-1.5">
+                      <FieldLabel
+                        htmlFor={`kpi-current-${k.id}`}
+                        className="text-[10px] text-muted-foreground"
+                      >
+                        Поточне
+                      </FieldLabel>
+                      <Input
+                        id={`kpi-current-${k.id}`}
+                        type="number"
+                        value={k.current}
+                        onChange={(e) =>
+                          onUpdate(k.id, (kk) => ({
+                            ...kk,
+                            current: Number(e.target.value) || 0,
+                          }))
+                        }
+                        className={cn(
+                          "h-7 min-w-0 text-xs font-bold px-2",
+                          isComplete ? "text-success" : kac.text,
+                        )}
+                      />
+                    </Field>
 
-                  <Field>
-                    <FieldLabel
-                      htmlFor={`kpi-target-${k.id}`}
-                      className="text-[10px] text-muted-foreground"
-                    >
-                      Ціль
-                    </FieldLabel>
-                    <Input
-                      id={`kpi-target-${k.id}`}
-                      type="number"
-                      value={k.target}
-                      onChange={(e) =>
-                        onUpdate(k.id, (kk) => ({
-                          ...kk,
-                          target: Number(e.target.value) || 0,
-                        }))
-                      }
-                      className="h-7 text-xs font-medium px-2"
-                    />
-                  </Field>
+                    <Field className="min-w-0 gap-1.5">
+                      <FieldLabel
+                        htmlFor={`kpi-target-${k.id}`}
+                        className="text-[10px] text-muted-foreground"
+                      >
+                        Ціль
+                      </FieldLabel>
+                      <Input
+                        id={`kpi-target-${k.id}`}
+                        type="number"
+                        value={k.target}
+                        onChange={(e) =>
+                          onUpdate(k.id, (kk) => ({
+                            ...kk,
+                            target: Number(e.target.value) || 0,
+                          }))
+                        }
+                        className="h-7 min-w-0 text-xs font-medium px-2"
+                      />
+                    </Field>
+                  </div>
 
                   <Field>
                     <FieldLabel className="text-[10px] text-muted-foreground">
@@ -211,7 +216,9 @@ export function KPITable({
               </ItemContent>
             </Item>
           );
-        })}
+          })}
+        </div>
+      )}
     </div>
   );
 }

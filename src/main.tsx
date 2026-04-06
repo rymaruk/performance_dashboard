@@ -5,15 +5,18 @@ import "./index.css";
 import App from "./App.tsx";
 import { ConfirmProvider } from "./hooks/ConfirmContext";
 import { AuthProvider } from "./hooks/AuthContext";
+import { ThemeProvider } from "./components/theme-provider";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
-      <AuthProvider>
-        <ConfirmProvider>
-          <App />
-        </ConfirmProvider>
-      </AuthProvider>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <AuthProvider>
+          <ConfirmProvider>
+            <App />
+          </ConfirmProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   </StrictMode>,
 );

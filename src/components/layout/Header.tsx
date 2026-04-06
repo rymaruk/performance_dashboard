@@ -19,6 +19,7 @@ import {
   User,
   LogOut,
 } from "lucide-react";
+import { ModeToggle } from "../ui/mode-toggle";
 
 export function Header() {
   const { profile, isAdmin, logout } = useAuth();
@@ -40,6 +41,7 @@ export function Header() {
       </div>
 
       <div className="flex gap-2 items-center">
+        <ModeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="rounded-full p-0 outline-none">

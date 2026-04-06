@@ -171,10 +171,47 @@ export function UsersPage() {
 
         {showForm && (
           <Card className="mb-5 py-5">
-            <CardHeader className="px-5 pb-0 pt-0">
+            <CardHeader className="flex flex-row items-center justify-between gap-3 px-5 pb-0 pt-0 space-y-0">
               <CardTitle className="text-sm">Створити користувача</CardTitle>
+              <div className="flex items-center gap-2 shrink-0">
+                <ColorPicker value={fColor} onChange={setFColor} />
+              </div>
             </CardHeader>
             <CardContent className="space-y-3 px-5 pt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] text-muted-foreground">Логін *</Label>
+                  <Input
+                    className="text-[13px]"
+                    value={fLogin}
+                    onChange={(e) => setFLogin(e.target.value)}
+                    placeholder="andrii_iv"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] text-muted-foreground">Пароль *</Label>
+                  <Input
+                    type="password"
+                    className="text-[13px]"
+                    value={fPassword}
+                    onChange={(e) => setFPassword(e.target.value)}
+                    placeholder="мін. 6 символів"
+                  />
+                </div>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-muted-foreground">Email *</Label>
+                <Input
+                  type="email"
+                  className="text-[13px]"
+                  value={fEmail}
+                  onChange={(e) => setFEmail(e.target.value)}
+                  placeholder="user@example.com"
+                />
+              </div>
+              </div>
+
+              <Separator className="mt-[30px] mb-[30px]" />
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-[11px] text-muted-foreground">Імʼя *</Label>
@@ -195,46 +232,14 @@ export function UsersPage() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-[11px] text-muted-foreground">Email *</Label>
-                  <Input
-                    type="email"
-                    className="text-[13px]"
-                    value={fEmail}
-                    onChange={(e) => setFEmail(e.target.value)}
-                    placeholder="user@example.com"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-[11px] text-muted-foreground">Логін *</Label>
-                  <Input
-                    className="text-[13px]"
-                    value={fLogin}
-                    onChange={(e) => setFLogin(e.target.value)}
-                    placeholder="andrii_iv"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-[auto_1fr_1fr_1fr] gap-3 items-end">
-                <div className="space-y-1.5">
-                  <Label className="text-[11px] text-muted-foreground">Колір</Label>
-                  <ColorPicker value={fColor} onChange={setFColor} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-[11px] text-muted-foreground">Пароль *</Label>
-                  <Input
-                    type="password"
-                    className="text-[13px]"
-                    value={fPassword}
-                    onChange={(e) => setFPassword(e.target.value)}
-                    placeholder="мін. 6 символів"
-                  />
-                </div>
+              
+              <Separator className="mt-[30px] mb-[30px]" />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-[11px] text-muted-foreground">Роль</Label>
                   <Select value={fRole} onValueChange={(v) => setFRole(v as "admin" | "user")}>
-                    <SelectTrigger className="text-[13px]">
+                    <SelectTrigger className="w-full text-[13px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -248,7 +253,7 @@ export function UsersPage() {
                 <div className="space-y-1.5">
                   <Label className="text-[11px] text-muted-foreground">Команда</Label>
                   <Select value={fTeamId || "__none__"} onValueChange={(v) => setFTeamId(v === "__none__" ? "" : v)}>
-                    <SelectTrigger className="text-[13px]">
+                    <SelectTrigger className="w-full text-[13px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
