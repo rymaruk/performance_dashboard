@@ -73,74 +73,85 @@ export function ProjectBar({
   }
 
   return (
-    <div className="bg-card border-b border-border px-4 py-2 flex items-center gap-2 overflow-x-auto">
-      {projects.length === 0 && (
-        <span className="text-xs text-muted-foreground">
-          {isAdmin
-            ? "Немає проектів — додайте перший"
-            : "Немає проектів із вашими призначеними задачами"}
-        </span>
-      )}
+    <div className="bg-card border-b border-border px-4 py-2 flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto overscroll-x-contain scroll-smooth [scrollbar-width:thin]">
+        {projects.length === 0 && (
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {isAdmin
+              ? "Немає проектів — додайте перший"
+              : "Немає проектів із вашими призначеними задачами"}
+          </span>
+        )}
 
-      {projects.map((p) => {
-        const isActive = p.id === activeProjectId;
-        const pac = getAccentDef(p.color);
-        return (
-          <HoverCard key={p.id} openDelay={200} closeDelay={100}>
-            <HoverCardTrigger asChild>
-              <button
-                onClick={() => onSwitch(p.id)}
-                className="text-left focus:outline-none"
-              >
-                <Item
-                  variant={isActive ? "default" : "outline"}
-                  size="sm"
-                  className={cn(
-                    "cursor-pointer rounded-lg px-2 py-1 items-center transition-colors",
-                    isActive
-                      ? "text-white shadow-sm"
-                      : cn("hover:bg-accent", pac.bgLight),
-                  )}
-                  style={isActive ? { backgroundColor: pac.hex } : undefined}
-                >
-                  <ItemMedia>
-                    <FolderOpen className="size-4" />
-                  </ItemMedia>
-                  <ItemContent>
-                    <ItemTitle className={cn("text-xs", isActive && "font-bold")}>
-                      {p.name}
-                    </ItemTitle>
-                  </ItemContent>
-                  {isActive && isAdmin && (
-                    <ItemActions>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-6 text-white/70 hover:text-white hover:bg-white/10"
-                        onClick={(e) => { e.stopPropagation(); handleOpen(); }}
-                      >
-                        <Pencil className="size-3" />
-                      </Button>
-                    </ItemActions>
-                  )}
-                </Item>
-              </button>
-            </HoverCardTrigger>
-            <HoverCardContent className="flex w-72 flex-col gap-1">
-              <div className="font-semibold">{p.name}</div>
-              <div className="text-sm text-muted-foreground">
-                {p.desc || "Без опису"}
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                Цілей: {p.goals.length} · Задач: {p.goals.reduce((a, g) => a + g.tasks.length, 0)}
-              </div>
-            </HoverCardContent>
-          </HoverCard>
-        );
-      })}
+        {projects.map((p) => {
+          const isActive = p.id === activeProjectId;
+          const pac = getAccentDef(p.color);
+          return (
+            <div key={p.id} className="shrink-0">
+              <HoverCard openDelay={200} closeDelay={100}>
+                <HoverCardTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => onSwitch(p.id)}
+                    className="max-w-none rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  >
+                    <Item
+                      variant={isActive ? "default" : "outline"}
+                      size="sm"
+                      className={cn(
+                        "w-max max-w-none cursor-pointer items-center rounded-lg px-2 py-1 transition-colors",
+                        isActive
+                          ? "text-white shadow-sm"
+                          : cn("hover:bg-accent", pac.bgLight),
+                      )}
+                      style={isActive ? { backgroundColor: pac.hex } : undefined}
+                    >
+                      <ItemMedia>
+                        <FolderOpen className="size-4 shrink-0" />
+                      </ItemMedia>
+                      <ItemContent className="shrink-0 grow-0 basis-auto">
+                        <ItemTitle
+                          className={cn(
+                            "text-xs whitespace-nowrap",
+                            isActive && "font-bold",
+                          )}
+                        >
+                          {p.name}
+                        </ItemTitle>
+                      </ItemContent>
+                      {isActive && isAdmin && (
+                        <ItemActions>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-6 text-white/70 hover:bg-white/10 hover:text-white"
+                            onClick={(e) => { e.stopPropagation(); handleOpen(); }}
+                          >
+                            <Pencil className="size-3" />
+                          </Button>
+                        </ItemActions>
+                      )}
+                    </Item>
+                  </button>
+                </HoverCardTrigger>
+                <HoverCardContent className="flex w-72 flex-col gap-1">
+                  <div className="font-semibold">{p.name}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {p.desc || "Без опису"}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Цілей: {p.goals.length} · Задач:{" "}
+                    {p.goals.reduce((a, g) => a + g.tasks.length, 0)}
+                  </div>
+                </HoverCardContent>
+              </HoverCard>
+            </div>
+          );
+        })}
+      </div>
 
       {isAdmin && (
-        <Button onClick={onAddProject} size="sm" className="ml-auto shrink-0">
+        <Button onClick={onAddProject} size="sm" className="shrink-0">
           <Plus className="size-3.5" /> Проект
         </Button>
       )}
