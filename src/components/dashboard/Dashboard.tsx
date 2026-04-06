@@ -32,6 +32,7 @@ import {
   ItemMedia,
   ItemActions,
 } from "../ui/item";
+import { getAccentDef } from "../../constants";
 import { roleColor } from "../../utils/roleColor";
 import { medDate, diffDays, today } from "../../utils/date";
 import type { Project, ProjectStats, Role } from "../../types";
@@ -74,27 +75,27 @@ export function Dashboard({ proj, stats }: DashboardProps) {
     return Object.entries(map).map(([prio, s]) => ({ prio, ...s, pct: s.total ? Math.round((s.done / s.total) * 100) : 0 }));
   }, [proj]);
 
-  interface KpiItem { name: string; current: number; target: number; unit: string; pct: number; done: boolean; goal: string }
-  interface TeamKpi { role: Role; kpis: KpiItem[]; totalDone: number; totalCount: number; pct: number }
+  interface KpiItem { name: string; current: number; target: number; unit: string; pct: number; done: boolean; goal: string; goalColor: string | null }
+  interface TeamKpi { role: Role; kpis: KpiItem[]; totalDone: number; totalCount: number; pct: number; goalColor: string | null }
 
   const kpiAgg = useMemo(() => {
     let completed = 0, total = 0;
-    const byTeam: Record<string, KpiItem[]> = {};
+    const byTeam: Record<string, { kpis: KpiItem[]; goalColor: string | null }> = {};
     proj.goals.forEach((g) => {
       const team = g.owner;
-      if (!byTeam[team]) byTeam[team] = [];
+      if (!byTeam[team]) byTeam[team] = { kpis: [], goalColor: g.color };
       g.kpis.forEach((k) => {
         total++;
         const isDone = k.current >= k.target;
         if (isDone) completed++;
-        byTeam[team].push({ name: k.name, current: k.current, target: k.target, unit: k.unit, pct: k.target ? Math.round((k.current / k.target) * 100) : 0, done: isDone, goal: g.title || "—" });
+        byTeam[team].kpis.push({ name: k.name, current: k.current, target: k.target, unit: k.unit, pct: k.target ? Math.round((k.current / k.target) * 100) : 0, done: isDone, goal: g.title || "—", goalColor: g.color });
       });
     });
     const teams: TeamKpi[] = Object.entries(byTeam)
-      .sort((a, b) => b[1].length - a[1].length)
-      .map(([role, kpis]) => {
+      .sort((a, b) => b[1].kpis.length - a[1].kpis.length)
+      .map(([role, { kpis, goalColor }]) => {
         const totalDone = kpis.filter((k) => k.done).length;
-        return { role: role as Role, kpis, totalDone, totalCount: kpis.length, pct: kpis.length ? Math.round((totalDone / kpis.length) * 100) : 0 };
+        return { role: role as Role, kpis, totalDone, totalCount: kpis.length, pct: kpis.length ? Math.round((totalDone / kpis.length) * 100) : 0, goalColor };
       });
     return { completed, total, teams };
   }, [proj]);
@@ -102,7 +103,7 @@ export function Dashboard({ proj, stats }: DashboardProps) {
   const markers = useMemo(() => {
     const now = today();
     let overdueTasks = 0, blockedGoals = 0, upcomingDeadlines = 0;
-    const overdueByTeam: Record<string, { title: string; endDate: string; goal: string }[]> = {};
+    const overdueByTeam: Record<string, { title: string; endDate: string; goal: string; color: string | null }[]> = {};
     proj.goals.forEach((g) => {
       if (g.status === "Заблоковано") blockedGoals++;
       const daysLeft = diffDays(now, g.endDate);
@@ -112,7 +113,7 @@ export function Dashboard({ proj, stats }: DashboardProps) {
           overdueTasks++;
           const team = t.assignee;
           if (!overdueByTeam[team]) overdueByTeam[team] = [];
-          overdueByTeam[team].push({ title: t.title, endDate: t.endDate, goal: g.title });
+          overdueByTeam[team].push({ title: t.title, endDate: t.endDate, goal: g.title, color: t.color ?? g.color });
         }
       });
     });
@@ -189,11 +190,11 @@ export function Dashboard({ proj, stats }: DashboardProps) {
               ) : (
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-4">
                   {kpiAgg.teams.map((t) => {
-                    const rc = roleColor(t.role);
+                    const tac = getAccentDef(t.goalColor);
                     const teamDone = t.totalDone;
                     const teamRemaining = t.totalCount - t.totalDone;
                     const teamConfig: ChartConfig = {
-                      done: { label: "Виконано", color: rc.fill },
+                      done: { label: "Виконано", color: tac.hex },
                       remaining: { label: "Залишилось", color: "var(--muted)" },
                     };
                     return (
@@ -324,11 +325,13 @@ export function Dashboard({ proj, stats }: DashboardProps) {
                 <div className="flex flex-col gap-3">
                   {teamStats.map((t) => {
                     const rc = roleColor(t.role);
+                    const goalForRole = proj.goals.find((g) => g.owner === t.role);
+                    const tac = goalForRole ? getAccentDef(goalForRole.color) : { text: rc.text, bg: rc.bg };
                     return (
                       <div key={t.role} className="flex items-center gap-3">
-                        <span className={cn("text-xs font-bold w-[80px] shrink-0 truncate", rc.text)}>{t.role}</span>
+                        <span className={cn("text-xs font-bold w-[80px] shrink-0 truncate", tac.text)}>{t.role}</span>
                         <div className="flex-1 min-w-0">
-                          <ProgressBar current={t.done} target={t.total} colorClass={rc.bg} />
+                          <ProgressBar current={t.done} target={t.total} colorClass={tac.bg} />
                         </div>
                         <span className="text-xs tabular-nums font-semibold shrink-0 w-[52px] text-right">
                           {t.done}/{t.total}
@@ -483,32 +486,32 @@ export function Dashboard({ proj, stats }: DashboardProps) {
                 {proj.goals.map((g) => {
                   const doneTasks = g.tasks.filter((t) => t.status === "Done").length;
                   const doneKPIs = g.kpis.filter((k) => k.current >= k.target).length;
-                  const rc = roleColor(g.owner);
+                  const gac = getAccentDef(g.color);
                   const taskTotal = g.tasks.length;
                   const kpiTotal = g.kpis.length;
 
                   return (
-                    <div key={g.id} className={cn("rounded-lg border overflow-hidden", rc.bgLight, rc.border)}>
+                    <div key={g.id} className={cn("rounded-lg border overflow-hidden", gac.bgLight, gac.border)}>
                       <div className="px-3 pt-3 pb-1">
                         <div className="text-[13px] font-bold truncate">{g.title || "—"}</div>
                         <div className="flex gap-1.5 items-center mt-1 flex-wrap">
-                          <Badge variant="secondary" className={cn("text-[10px]", rc.text)}>{g.owner}</Badge>
+                          <Badge variant="secondary" className={cn("text-[10px]", gac.text)}>{g.owner}</Badge>
                           <Badge variant="outline" className="text-[10px]">📅 {medDate(g.startDate)} – {medDate(g.endDate)}</Badge>
                         </div>
                         <div className="grid grid-cols-2 gap-2 mt-2 text-[10px]">
                           <div>
                             <span className="text-muted-foreground">Задачі</span>
-                            <span className={cn("ml-1 font-bold", rc.text)}>{doneTasks}/{taskTotal}</span>
+                            <span className={cn("ml-1 font-bold", gac.text)}>{doneTasks}/{taskTotal}</span>
                           </div>
                           <div>
                             <span className="text-muted-foreground">KPI</span>
-                            <span className="ml-1 font-bold text-chart-2">{doneKPIs}/{kpiTotal}</span>
+                            <span className={cn("ml-1 font-bold", gac.text)}>{doneKPIs}/{kpiTotal}</span>
                           </div>
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-2 px-3 pb-2.5 pt-1">
-                        <ProgressBar current={doneTasks} target={taskTotal} colorClass={rc.bg} />
-                        <ProgressBar current={doneKPIs} target={kpiTotal} colorClass="bg-chart-2" />
+                        <ProgressBar current={doneTasks} target={taskTotal} colorClass={gac.bg} />
+                        <ProgressBar current={doneKPIs} target={kpiTotal} colorClass={gac.bg} />
                       </div>
                     </div>
                   );
@@ -530,14 +533,15 @@ export function Dashboard({ proj, stats }: DashboardProps) {
           <CardContent>
             <ItemGroup className="gap-2.5">
               {Object.entries(markers.overdueByTeam).map(([team, tasks]) => {
-                const rc = roleColor(team as Role);
+                const firstColor = tasks[0]?.color;
+                const oac = getAccentDef(firstColor);
                 return (
                   <div key={team}>
-                    <Item size="xs" className={cn("rounded-t-md gap-1.5", rc.bgLight)}>
+                    <Item size="xs" className={cn("rounded-t-md gap-1.5", oac.bgLight)}>
                       <ItemMedia className="self-center">
-                        <span className={cn("size-2 rounded-full", rc.bg)} />
+                        <span className={cn("size-2 rounded-full", oac.bg)} />
                       </ItemMedia>
-                      <ItemTitle className={cn("text-xs", rc.text)}>{team}</ItemTitle>
+                      <ItemTitle className={cn("text-xs", oac.text)}>{team}</ItemTitle>
                       <ItemActions>
                         <Badge variant="destructive" className="text-[10px] font-semibold">
                           {tasks.length} {tasks.length === 1 ? "задача" : "задач"}

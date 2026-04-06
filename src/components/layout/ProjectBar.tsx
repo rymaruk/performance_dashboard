@@ -4,6 +4,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { Label } from "../ui/label";
+import { ColorPicker } from "../ui/color-picker";
 import {
   Item,
   ItemActions,
@@ -25,6 +26,8 @@ import {
   HoverCardTrigger,
 } from "../ui/hover-card";
 import { useConfirmAction } from "../../hooks/ConfirmContext";
+import { getAccentDef } from "../../constants";
+import type { AccentColor } from "../../constants";
 import { FolderOpen, Pencil, Plus, Trash2 } from "lucide-react";
 import type { Project } from "../../types";
 
@@ -34,6 +37,7 @@ interface ProjectBarProps {
   onSwitch: (id: string) => void;
   onUpdateName: (v: string) => void;
   onUpdateDesc: (v: string) => void;
+  onUpdateColor: (v: string) => void;
   onDelete: () => void;
   onAddProject: () => void;
 }
@@ -44,6 +48,7 @@ export function ProjectBar({
   onSwitch,
   onUpdateName,
   onUpdateDesc,
+  onUpdateColor,
   onDelete,
   onAddProject,
 }: ProjectBarProps) {
@@ -52,11 +57,13 @@ export function ProjectBar({
   const [open, setOpen] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
+  const [editColor, setEditColor] = useState<AccentColor | string>("sky");
 
   function handleOpen() {
     if (proj) {
       setEditName(proj.name);
       setEditDesc(proj.desc);
+      setEditColor(proj.color ?? "sky");
     }
     setOpen(true);
   }
@@ -64,6 +71,7 @@ export function ProjectBar({
   function handleSave() {
     onUpdateName(editName);
     onUpdateDesc(editDesc);
+    onUpdateColor(editColor);
     setOpen(false);
   }
 
@@ -77,6 +85,7 @@ export function ProjectBar({
 
       {projects.map((p) => {
         const isActive = p.id === activeProjectId;
+        const pac = getAccentDef(p.color);
         return (
           <HoverCard key={p.id} openDelay={200} closeDelay={100}>
             <HoverCardTrigger asChild>
@@ -90,9 +99,10 @@ export function ProjectBar({
                   className={cn(
                     "cursor-pointer rounded-lg px-2 py-1 items-center transition-colors",
                     isActive
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "hover:bg-accent",
+                      ? "text-white shadow-sm"
+                      : cn("hover:bg-accent", pac.bgLight),
                   )}
+                  style={isActive ? { backgroundColor: pac.hex } : undefined}
                 >
                   <ItemMedia>
                     <FolderOpen className="size-4" />
@@ -107,7 +117,7 @@ export function ProjectBar({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="size-6 text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                        className="size-6 text-white/70 hover:text-white hover:bg-white/10"
                         onClick={(e) => { e.stopPropagation(); handleOpen(); }}
                       >
                         <Pencil className="size-3" />
@@ -145,7 +155,14 @@ export function ProjectBar({
             </DialogHeader>
             <div className="grid gap-4 py-2">
               <div className="grid gap-2">
-                <Label htmlFor="proj-name">Назва проекту</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="proj-name">Назва проекту</Label>
+                  <ColorPicker
+                    value={editColor}
+                    onChange={(c: AccentColor) => setEditColor(c)}
+                    size="sm"
+                  />
+                </div>
                 <Input
                   id="proj-name"
                   value={editName}

@@ -9,8 +9,11 @@ import {
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/AuthContext";
 import { useConfirmAction } from "../hooks/ConfirmContext";
+import { getAccentDef, DEFAULT_ACCENT, ACCENT_COLORS } from "../constants";
+import type { AccentColor } from "../constants";
 import type { Team, TeamStatus, UserProfile } from "../types";
 import { cn } from "@/lib/utils";
+import { ColorPicker } from "@/components/ui/color-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +39,7 @@ export function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [newName, setNewName] = useState("");
+  const [newColor, setNewColor] = useState<AccentColor>(DEFAULT_ACCENT);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
@@ -62,12 +66,13 @@ export function TeamsPage() {
   const handleAdd = async () => {
     if (!newName.trim()) return;
     setError(null);
-    const { error: e } = await supabase.from("teams").insert({ name: newName.trim(), status: "active" });
+    const { error: e } = await supabase.from("teams").insert({ name: newName.trim(), status: "active", color: newColor });
     if (e) {
       setError(e.message);
       return;
     }
     setNewName("");
+    setNewColor(ACCENT_COLORS[(teams.length + 1) % ACCENT_COLORS.length].key);
     load();
   };
 
@@ -103,6 +108,11 @@ export function TeamsPage() {
     load();
   };
 
+  const handleColorChange = async (team: Team, color: AccentColor) => {
+    setTeams((prev) => prev.map((tt) => (tt.id === team.id ? { ...tt, color } : tt)));
+    await supabase.from("teams").update({ color }).eq("id", team.id);
+  };
+
   const teamMembers = (teamId: string) => allUsers.filter((u) => u.team_id === teamId);
   const availableUsers = (teamId: string) =>
     allUsers.filter((u) => u.team_id !== teamId && u.id !== "00000000-0000-0000-0000-000000000001");
@@ -119,6 +129,12 @@ export function TeamsPage() {
           </CardHeader>
           <CardContent className="px-5 pt-3">
             <div className="flex gap-2.5 items-end">
+              <div className="flex items-end gap-2">
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Колір</Label>
+                  <ColorPicker value={newColor} onChange={setNewColor} />
+                </div>
+              </div>
               <div className="flex-1 space-y-1">
                 <Label htmlFor="team-name" className="text-[11px] text-muted-foreground">Назва команди</Label>
                 <Input
@@ -163,7 +179,7 @@ export function TeamsPage() {
             return (
               <Card
                 key={t.id}
-                className={cn("mb-3 overflow-hidden py-0", t.status === "suspended" && "opacity-70")}
+                className={cn("mb-3 overflow-hidden py-0 border-l-4", t.status === "suspended" && "opacity-70", getAccentDef(t.color).border)}
               >
                 <div
                   className="flex cursor-pointer items-center gap-3 px-5 py-3.5 transition-colors hover:bg-accent/50"
@@ -171,6 +187,12 @@ export function TeamsPage() {
                 >
                   <ChevronRight
                     className={cn("size-4 shrink-0 text-muted-foreground transition-transform", isOpen && "rotate-90")}
+                  />
+
+                  <ColorPicker
+                    value={t.color}
+                    onChange={(c) => handleColorChange(t, c)}
+                    size="sm"
                   />
 
                   <div className="min-w-0 flex-1">

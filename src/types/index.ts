@@ -6,6 +6,7 @@ export interface Team {
   id: string;
   name: string;
   status: TeamStatus;
+  color: string | null;
   created_at: string;
 }
 
@@ -21,6 +22,7 @@ export interface UserProfile {
   login: string;
   role: UserRole;
   team_id: string | null;
+  color: string | null;
   created_at: string;
   team?: Team | null;
 }
@@ -42,6 +44,7 @@ export interface KpiDefinition {
   unit: string;
   target_value: number;
   description: string;
+  color: string | null;
   created_at: string;
 }
 
@@ -55,6 +58,7 @@ export interface KPI {
   current: number;
   target: number;
   unit: string;
+  color: string | null;
 }
 
 /* ── DB row shape for goal_kpis junction ── */
@@ -64,6 +68,7 @@ export interface GoalKpiRow {
   kpi_definition_id: string;
   current_value: number;
   target_value: number;
+  color: string | null;
   created_at: string;
   kpi_definition?: KpiDefinition;
 }
@@ -106,6 +111,7 @@ export interface Task {
   startDate: string;
   endDate: string;
   status: TaskStatus;
+  color: string | null;
 }
 
 /* ── DB row shape for Task ── */
@@ -118,6 +124,7 @@ export interface TaskRow {
   status: string;
   start_date: string;
   end_date: string;
+  color: string | null;
   created_at: string;
 }
 
@@ -133,6 +140,7 @@ export interface Goal {
   status: GoalStatus;
   startDate: string;
   endDate: string;
+  color: string | null;
   kpis: KPI[];
   tasks: Task[];
 }
@@ -148,6 +156,7 @@ export interface GoalRow {
   status: string;
   start_date: string;
   end_date: string;
+  color: string | null;
   created_at: string;
 }
 
@@ -157,6 +166,7 @@ export interface Project {
   id: string;
   name: string;
   desc: string;
+  color: string | null;
   goals: Goal[];
   createdAt: number;
 }
@@ -166,6 +176,7 @@ export interface ProjectRow {
   id: string;
   name: string;
   description: string;
+  color: string | null;
   created_at: string;
 }
 

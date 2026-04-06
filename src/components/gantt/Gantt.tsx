@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { roleColor } from "../../utils/roleColor";
+import { getAccentDef } from "../../constants";
 import { DateRangePicker } from "../ui";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { GANTT_PX } from "../../constants";
@@ -104,7 +104,7 @@ export function Gantt({
               </div>
 
               {proj.goals.map((g) => {
-                const rc = roleColor(g.owner);
+                const gac = getAccentDef(g.color);
                 const gOpen = ganttExpanded[g.id];
                 const doneTasks = g.tasks.filter((t) => t.status === "Done").length;
                 const pct = g.tasks.length ? Math.round((doneTasks / g.tasks.length) * 100) : 0;
@@ -113,21 +113,21 @@ export function Gantt({
                 return (
                   <div key={g.id}>
                     <div
-                      className={cn("flex items-center h-[34px] border-b border-border cursor-pointer", rc.bgLight)}
+                      className={cn("flex items-center h-[34px] border-b border-border cursor-pointer", gac.bgLight)}
                       onClick={() => onToggleGoal(g.id)}
                     >
                       <div className="w-[260px] min-w-[260px] px-2.5 flex items-center gap-1.5 overflow-hidden">
                         <span className={cn("text-[11px] font-bold transition-transform", gOpen && "rotate-90")}>▶</span>
-                        <span className={cn("w-2 h-2 rounded-full shrink-0", rc.bg)} />
+                        <span className={cn("w-2 h-2 rounded-full shrink-0", gac.bg)} />
                         <span className="text-xs font-bold truncate">{g.title || "—"}</span>
                       </div>
-                      <div className={cn("w-[80px] min-w-[80px] text-[10px] font-semibold px-1", rc.text)}>
+                      <div className={cn("w-[80px] min-w-[80px] text-[10px] font-semibold px-1", gac.text)}>
                         {g.owner}
                       </div>
                       <div className="flex-1 relative h-[26px]">
                         <MonthBg ganttMonths={ganttMonths} pxPerDay={pxPerDay} />
                         <div
-                          className={cn("absolute top-1 h-[18px] rounded flex items-center justify-between px-1 shadow-sm overflow-visible", rc.bg)}
+                          className={cn("absolute top-1 h-[18px] rounded flex items-center justify-between px-1 shadow-sm overflow-visible", gac.bg)}
                           style={{ left: gBar.left, width: gBar.width }}
                         >
                           <DateRangePicker
@@ -145,7 +145,7 @@ export function Gantt({
 
                     {gOpen &&
                       g.tasks.map((t) => {
-                        const trc = roleColor(t.assignee);
+                        const tac = getAccentDef(t.color ?? g.color);
                         const tBar = barPos(t.startDate, t.endDate);
                         const isDone = t.status === "Done";
                         return (
@@ -154,7 +154,7 @@ export function Gantt({
                             className={cn("flex items-center h-7 border-b border-border/50", isDone ? "bg-success/5" : "bg-card")}
                           >
                             <div className="w-[260px] min-w-[260px] pl-8 pr-2.5 flex items-center gap-1 overflow-hidden">
-                              <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", trc.bg)} />
+                              <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", tac.bg)} />
                               <span
                                 className={cn("text-[11px] truncate", isDone ? "text-muted-foreground line-through" : "text-foreground")}
                                 title={t.desc || t.title}
@@ -167,13 +167,13 @@ export function Gantt({
                                 </span>
                               )}
                             </div>
-                            <div className={cn("w-[80px] min-w-[80px] text-[10px] font-semibold px-1", trc.text)}>
+                            <div className={cn("w-[80px] min-w-[80px] text-[10px] font-semibold px-1", tac.text)}>
                               {t.assignee}
                             </div>
                             <div className="flex-1 relative h-5">
                               <MonthBg ganttMonths={ganttMonths} pxPerDay={pxPerDay} />
                               <div
-                                className={cn("absolute top-1 h-3 rounded-sm opacity-80 flex items-center justify-center overflow-visible", isDone ? "bg-muted-foreground" : trc.bg)}
+                                className={cn("absolute top-1 h-3 rounded-sm opacity-80 flex items-center justify-center overflow-visible", isDone ? "bg-muted-foreground" : tac.bg)}
                                 style={{ left: tBar.left, width: tBar.width }}
                               >
                                 {tBar.width > 50 && (
@@ -204,18 +204,19 @@ export function Gantt({
               })}
 
               <div className="flex gap-5 px-2.5 py-3.5 flex-wrap">
-                {[
-                  { l: "SMM", cls: "bg-chart-1" },
-                  { l: "SEO", cls: "bg-chart-2" },
-                  { l: "Media Buyer", cls: "bg-chart-3" },
-                  { l: "Команда", cls: "bg-chart-4" },
-                  { l: "Done", cls: "bg-muted-foreground" },
-                ].map((x) => (
-                  <div key={x.l} className="flex items-center gap-1 text-[11px] text-foreground">
-                    <span className={cn("w-3.5 h-2.5 rounded-sm inline-block", x.cls)} />
-                    <span className="font-semibold">{x.l}</span>
-                  </div>
-                ))}
+                {proj.goals.map((g) => {
+                  const lac = getAccentDef(g.color);
+                  return (
+                    <div key={g.id} className="flex items-center gap-1 text-[11px] text-foreground">
+                      <span className={cn("w-3.5 h-2.5 rounded-sm inline-block", lac.bg)} />
+                      <span className="font-semibold truncate max-w-[120px]">{g.title || g.owner}</span>
+                    </div>
+                  );
+                })}
+                <div className="flex items-center gap-1 text-[11px] text-foreground">
+                  <span className="w-3.5 h-2.5 rounded-sm inline-block bg-muted-foreground" />
+                  <span className="font-semibold">Done</span>
+                </div>
                 <span className="text-[10px] text-muted-foreground ml-auto">
                   ▶ Клік = задачі · 📅 Клік на дати = редагувати
                 </span>

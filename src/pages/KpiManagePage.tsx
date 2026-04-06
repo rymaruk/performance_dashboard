@@ -4,8 +4,11 @@ import { ChevronRight, Loader2, Plus } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/AuthContext";
 import { useConfirmAction } from "../hooks/ConfirmContext";
+import { getAccentDef, DEFAULT_ACCENT } from "../constants";
+import type { AccentColor } from "../constants";
 import type { KpiDefinition } from "../types";
 import { cn } from "@/lib/utils";
+import { ColorPicker } from "@/components/ui/color-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,6 +50,7 @@ export function KpiManagePage() {
   const [newUnit, setNewUnit] = useState("%");
   const [newTarget, setNewTarget] = useState("100");
   const [newDesc, setNewDesc] = useState("");
+  const [newColor, setNewColor] = useState<AccentColor>(DEFAULT_ACCENT);
 
   const [expandedKpi, setExpandedKpi] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -54,6 +58,7 @@ export function KpiManagePage() {
   const [editUnit, setEditUnit] = useState("");
   const [editTarget, setEditTarget] = useState("");
   const [editDesc, setEditDesc] = useState("");
+  const [editColor, setEditColor] = useState<AccentColor>(DEFAULT_ACCENT);
 
   const load = useCallback(async () => {
     const [defsRes, junctionRes, goalsRes, projRes] = await Promise.all([
@@ -118,6 +123,7 @@ export function KpiManagePage() {
       unit: newUnit.trim() || "%",
       target_value: Number(newTarget) || 100,
       description: newDesc.trim(),
+      color: newColor,
     });
     if (e) {
       setError(e.message.includes("idx_kpi_definitions_name") ? "KPI з такою назвою вже існує" : e.message);
@@ -127,6 +133,7 @@ export function KpiManagePage() {
     setNewUnit("%");
     setNewTarget("100");
     setNewDesc("");
+    setNewColor(DEFAULT_ACCENT);
     load();
   };
 
@@ -152,6 +159,7 @@ export function KpiManagePage() {
     setEditUnit(kpi.unit);
     setEditTarget(String(kpi.target_value));
     setEditDesc(kpi.description);
+    setEditColor((kpi.color as AccentColor) ?? DEFAULT_ACCENT);
   };
 
   const cancelEdit = () => setEditingId(null);
@@ -166,6 +174,7 @@ export function KpiManagePage() {
         unit: editUnit.trim() || "%",
         target_value: Number(editTarget) || 100,
         description: editDesc.trim(),
+        color: editColor,
       })
       .eq("id", editingId);
     if (e) {
@@ -187,7 +196,11 @@ export function KpiManagePage() {
         <Card className="mb-5 py-5">
           <CardContent className="space-y-3 px-5 pt-0">
             <div className="text-sm font-semibold text-foreground">Створити новий KPI показник</div>
-            <div className="grid grid-cols-[1fr_80px_80px] gap-2.5">
+            <div className="grid grid-cols-[auto_1fr_80px_80px] gap-2.5 items-end">
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground">Колір</Label>
+                <ColorPicker value={newColor} onChange={setNewColor} />
+              </div>
               <div className="space-y-1">
                 <Label htmlFor="kpi-name" className="text-[11px] text-muted-foreground">Назва *</Label>
                 <Input
@@ -275,6 +288,7 @@ export function KpiManagePage() {
                     <div className="min-w-0 flex-1">
                       {isEditing ? (
                         <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          <ColorPicker value={editColor} onChange={setEditColor} size="sm" />
                           <Input
                             className="w-48"
                             value={editName}
@@ -302,19 +316,22 @@ export function KpiManagePage() {
                           </Button>
                         </div>
                       ) : (
-                        <div>
-                          <div className="text-sm font-semibold text-foreground">
-                            {kpi.name}
-                            <span className="ml-2 text-[11px] font-normal text-muted-foreground">
-                              (ціль: {kpi.target_value} {kpi.unit})
-                            </span>
-                            <span className="ml-2 text-[11px] font-normal text-primary">
-                              — {kpi.goals.length} {kpi.goals.length === 1 ? "ціль" : "цілей"}
-                            </span>
+                        <div className="flex items-center gap-2">
+                          <span className={cn("size-3 rounded-full shrink-0", getAccentDef(kpi.color).bg)} />
+                          <div>
+                            <div className="text-sm font-semibold text-foreground">
+                              {kpi.name}
+                              <span className="ml-2 text-[11px] font-normal text-muted-foreground">
+                                (ціль: {kpi.target_value} {kpi.unit})
+                              </span>
+                              <span className="ml-2 text-[11px] font-normal text-primary">
+                                — {kpi.goals.length} {kpi.goals.length === 1 ? "ціль" : "цілей"}
+                              </span>
+                            </div>
+                            {kpi.description && (
+                              <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{kpi.description}</div>
+                            )}
                           </div>
-                          {kpi.description && (
-                            <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{kpi.description}</div>
-                          )}
                         </div>
                       )}
                     </div>
@@ -390,7 +407,7 @@ export function KpiManagePage() {
                                             <div
                                               className={cn(
                                                 "h-full rounded-full",
-                                                pct >= 100 ? "bg-success" : "bg-primary",
+                                                pct >= 100 ? "bg-success" : getAccentDef(kpi.color).bg,
                                               )}
                                               style={{ width: `${pct}%` }}
                                             />
@@ -398,7 +415,7 @@ export function KpiManagePage() {
                                           <span
                                             className={cn(
                                               "text-[11px] font-semibold",
-                                              pct >= 100 ? "text-success" : "text-muted-foreground",
+                                              pct >= 100 ? "text-success" : getAccentDef(kpi.color).text,
                                             )}
                                           >
                                             {pct}%

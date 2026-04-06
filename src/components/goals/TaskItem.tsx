@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { Editable, EditableArea, DateRangePicker, LinksEditor } from "../ui";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
-import { roleColor } from "../../utils/roleColor";
+import { getAccentDef } from "../../constants";
 import { useConfirmAction } from "../../hooks/ConfirmContext";
 import { TSTAT, TASK_ROLES } from "../../constants";
 import { ChevronRight, X, FileText } from "lucide-react";
@@ -32,7 +32,7 @@ export function TaskItem({
   onUpdateLink,
 }: TaskItemProps) {
   const confirm = useConfirmAction();
-  const rc = roleColor(t.assignee);
+  const ac = getAccentDef(t.color ?? g.color);
 
   return (
     <div className={cn("mb-1.5 border border-border rounded-md overflow-hidden", t.status === "Done" ? "bg-success/5" : "bg-card")}>
@@ -52,7 +52,7 @@ export function TaskItem({
           value={t.assignee}
           onChange={(v) => onUpdate((tt) => ({ ...tt, assignee: v as Task["assignee"] }))}
           options={[...TASK_ROLES]}
-          className={cn("text-[10px] font-semibold px-2 py-px rounded-full", rc.bgLight, rc.text)}
+          className={cn("text-[10px] font-semibold px-2 py-px rounded-full", ac.bgLight, ac.text)}
         />
 
         <DateRangePicker

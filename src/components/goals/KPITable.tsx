@@ -21,11 +21,13 @@ import {
   SelectValue,
 } from "../ui/select";
 import { useConfirmAction } from "../../hooks/ConfirmContext";
+import { getAccentDef } from "../../constants";
 import { X, BarChart3, Plus } from "lucide-react";
 import type { KPI, KpiDefinition } from "../../types";
 
 interface KPITableProps {
   goalId: string;
+  goalColor?: string | null;
   kpis: KPI[];
   kpiDefinitions: KpiDefinition[];
   onAdd: (kpiDefId: string) => void;
@@ -33,7 +35,7 @@ interface KPITableProps {
   onUpdate: (kid: string, fn: (k: KPI) => KPI) => void;
 }
 
-export function KPITable({ kpis, kpiDefinitions, onAdd, onRemove, onUpdate }: KPITableProps) {
+export function KPITable({ goalColor, kpis, kpiDefinitions, onAdd, onRemove, onUpdate }: KPITableProps) {
   const confirm = useConfirmAction();
 
   const attachedDefIds = useMemo(
@@ -87,7 +89,9 @@ export function KPITable({ kpis, kpiDefinitions, onAdd, onRemove, onUpdate }: KP
             </TableRow>
           </TableHeader>
           <TableBody>
-            {kpis.map((k) => (
+            {kpis.map((k) => {
+              const kac = getAccentDef(k.color ?? goalColor);
+              return (
               <TableRow key={k.id}>
                 <TableCell>
                   <span className="font-medium text-foreground">{k.name}</span>
@@ -97,7 +101,7 @@ export function KPITable({ kpis, kpiDefinitions, onAdd, onRemove, onUpdate }: KP
                     value={k.current}
                     onChange={(v) => onUpdate(k.id, (kk) => ({ ...kk, current: Number(v) }))}
                     type="number"
-                    className={cn("font-bold", k.current >= k.target ? "text-success" : "text-chart-5")}
+                    className={cn("font-bold", k.current >= k.target ? "text-success" : kac.text)}
                   />
                 </TableCell>
                 <TableCell>
@@ -107,7 +111,7 @@ export function KPITable({ kpis, kpiDefinitions, onAdd, onRemove, onUpdate }: KP
                   <span className="text-[11px] text-muted-foreground">{k.unit}</span>
                 </TableCell>
                 <TableCell className="w-[110px]">
-                  <ProgressBar current={k.current} target={k.target} colorClass={k.current >= k.target ? "bg-success" : "bg-primary"} />
+                  <ProgressBar current={k.current} target={k.target} colorClass={k.current >= k.target ? "bg-success" : kac.bg} />
                 </TableCell>
                 <TableCell>
                   <Tooltip>
@@ -125,7 +129,8 @@ export function KPITable({ kpis, kpiDefinitions, onAdd, onRemove, onUpdate }: KP
                   </Tooltip>
                 </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       )}

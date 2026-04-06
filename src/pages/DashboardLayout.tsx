@@ -30,6 +30,7 @@ export function DashboardLayout() {
     switchProject,
     updateProjName,
     updateProjDesc,
+    updateProjColor,
     addGoal,
     removeGoal,
     updateGoalField,
@@ -75,6 +76,7 @@ export function DashboardLayout() {
         onSwitch={switchProject}
         onUpdateName={updateProjName}
         onUpdateDesc={updateProjDesc}
+        onUpdateColor={updateProjColor}
         onDelete={() => proj.id && deleteProject(proj.id)}
         onAddProject={addProject}
       />

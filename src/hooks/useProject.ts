@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthContext";
 import { today, addDays, diffDays, fmt } from "../utils/date";
-import { MONTH_NAMES } from "../constants";
+import { MONTH_NAMES, ACCENT_COLORS } from "../constants";
 import type {
   Project,
   Goal,
@@ -38,6 +38,7 @@ function goalFromRow(
     status: row.status as GoalStatus,
     startDate: row.start_date,
     endDate: row.end_date,
+    color: row.color ?? null,
     kpis,
     tasks,
   };
@@ -54,6 +55,7 @@ function taskFromRow(row: TaskRow, links: Link[]): Task {
     startDate: row.start_date,
     endDate: row.end_date,
     status: row.status as TaskStatus,
+    color: row.color ?? null,
   };
 }
 
@@ -67,6 +69,7 @@ function kpiFromJunction(row: GoalKpiRow): KPI {
     current: Number(row.current_value),
     target: Number(row.target_value),
     unit: def?.unit ?? "%",
+    color: row.color ?? def?.color ?? null,
   };
 }
 
@@ -84,7 +87,7 @@ function clampTasks(tasks: Task[], gs: string, ge: string): Task[] {
       sd = addDays(ge, -Math.min(dur, diffDays(gs, ge)));
       if (sd < gs) sd = gs;
     }
-    return { ...t, startDate: sd, endDate: ed };
+    return { ...t, startDate: sd, endDate: ed, color: t.color };
   });
 }
 
@@ -204,6 +207,7 @@ export function useProject() {
       id: pr.id,
       name: pr.name,
       desc: pr.description,
+      color: pr.color ?? null,
       goals: goalsByProject.get(pr.id) ?? [],
       createdAt: new Date(pr.created_at).getTime(),
     }));
@@ -325,9 +329,10 @@ export function useProject() {
 
   /* ─── Project actions ─── */
   const addProject = async () => {
+    const projColor = ACCENT_COLORS[projects.length % ACCENT_COLORS.length].key;
     const { data, error } = await supabase
       .from("projects")
-      .insert({ name: "Новий проект", description: "" })
+      .insert({ name: "Новий проект", description: "", color: projColor })
       .select()
       .single();
     if (error || !data) return;
@@ -335,6 +340,7 @@ export function useProject() {
       id: data.id,
       name: data.name,
       desc: data.description,
+      color: data.color ?? projColor,
       goals: [],
       createdAt: new Date(data.created_at).getTime(),
     };
@@ -373,10 +379,19 @@ export function useProject() {
       .eq("id", activeProjectId);
   };
 
+  const updateProjColor = async (v: string) => {
+    updateLocalProj((p) => ({ ...p, color: v }));
+    await supabase
+      .from("projects")
+      .update({ color: v })
+      .eq("id", activeProjectId);
+  };
+
   /* ─── Goal actions ─── */
   const addGoal = async () => {
     const s = today();
     const e = addDays(s, 90);
+    const goalColor = ACCENT_COLORS[proj.goals.length % ACCENT_COLORS.length].key;
     const { data, error } = await supabase
       .from("goals")
       .insert({
@@ -388,6 +403,7 @@ export function useProject() {
         status: "Планується",
         start_date: s,
         end_date: e,
+        color: goalColor,
       })
       .select()
       .single();
@@ -419,6 +435,10 @@ export function useProject() {
           ? "end_date"
           : field;
     if (["kpis", "tasks", "project_id"].includes(field as string)) return;
+    if (field === "color") {
+      await supabase.from("goals").update({ color: value }).eq("id", gid);
+      return;
+    }
     await supabase
       .from("goals")
       .update({ [dbField]: value })
@@ -471,6 +491,7 @@ export function useProject() {
         status: "To Do",
         start_date: sd,
         end_date: taskEnd,
+        color: g?.color ?? null,
       })
       .select()
       .single();
@@ -515,6 +536,7 @@ export function useProject() {
           status: u.status,
           start_date: u.startDate,
           end_date: u.endDate,
+          color: u.color,
         })
         .eq("id", tid);
     }
@@ -522,6 +544,7 @@ export function useProject() {
 
   /* ─── KPI actions (goal_kpis junction) ─── */
   const addKPI = async (gid: string, kpiDefinitionId: string) => {
+    const g = proj.goals.find((x) => x.id === gid);
     const { data, error } = await supabase
       .from("goal_kpis")
       .insert({
@@ -529,6 +552,7 @@ export function useProject() {
         kpi_definition_id: kpiDefinitionId,
         current_value: 0,
         target_value: 100,
+        color: g?.color ?? null,
       })
       .select("*, kpi_definition:kpi_definitions(*)")
       .single();
@@ -568,6 +592,7 @@ export function useProject() {
         .update({
           current_value: u.current,
           target_value: u.target,
+          color: u.color,
         })
         .eq("id", kid);
     }
@@ -630,6 +655,7 @@ export function useProject() {
     switchProject,
     updateProjName,
     updateProjDesc,
+    updateProjColor,
     addGoal,
     removeGoal,
     updateGoalField,

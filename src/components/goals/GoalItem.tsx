@@ -11,14 +11,16 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from "../ui/accordion";
+import { ColorPicker } from "../ui/color-picker";
 import { KPITable } from "./KPITable";
 import { TaskItem } from "./TaskItem";
-import { roleColor } from "../../utils/roleColor";
+import { getAccentDef } from "../../constants";
 import { medDate } from "../../utils/date";
 import { useConfirmAction } from "../../hooks/ConfirmContext";
 import { ROLES, PRIO, STAT } from "../../constants";
 import { Plus, X } from "lucide-react";
 import type { Goal, KPI, KpiDefinition, Task } from "../../types";
+import type { AccentColor } from "../../constants";
 
 interface GoalItemProps {
   goal: Goal;
@@ -58,22 +60,27 @@ export function GoalItem({
   onUpdateLink,
 }: GoalItemProps) {
   const confirm = useConfirmAction();
-  const rc = roleColor(g.owner);
+  const ac = getAccentDef(g.color);
 
   return (
     <AccordionItem
       value={g.id}
       className={cn(
         "bg-card rounded-lg mt-2 shadow-sm border-l-4 border overflow-hidden",
-        rc.border,
+        ac.border,
       )}
     >
       <AccordionTrigger
         className={cn(
           "px-4 py-3 flex flex-wrap gap-2 items-center hover:no-underline",
-          rc.bgLight,
+          ac.bgLight,
         )}
       >
+        <ColorPicker
+          value={g.color}
+          onChange={(c: AccentColor) => onUpdateField("color", c)}
+          size="sm"
+        />
         <div className="flex-1 min-w-[160px]" onClick={(e) => e.stopPropagation()}>
           <Editable
             value={g.title}
@@ -98,7 +105,7 @@ export function GoalItem({
             value={g.owner}
             onChange={(v) => onUpdateField("owner", v)}
             options={[...ROLES]}
-            className={cn("text-[11px] px-2.5 py-0.5 rounded-full font-semibold", rc.bgLight, rc.text)}
+            className={cn("text-[11px] px-2.5 py-0.5 rounded-full font-semibold", ac.bgLight, ac.text)}
           />
         </div>
         <div onClick={(e) => e.stopPropagation()}>
@@ -137,7 +144,7 @@ export function GoalItem({
       </AccordionTrigger>
 
       <AccordionContent className="px-4 pb-4">
-        <KPITable goalId={g.id} kpis={g.kpis} kpiDefinitions={kpiDefinitions} onAdd={onAddKPI} onRemove={onRemoveKPI} onUpdate={onUpdateKPI} />
+        <KPITable goalId={g.id} goalColor={g.color} kpis={g.kpis} kpiDefinitions={kpiDefinitions} onAdd={onAddKPI} onRemove={onRemoveKPI} onUpdate={onUpdateKPI} />
 
         <div>
           <div className="flex justify-between mb-2">

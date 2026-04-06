@@ -4,8 +4,11 @@ import { Loader2, Plus } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/AuthContext";
 import { useConfirmAction } from "../hooks/ConfirmContext";
+import { getAccentDef, DEFAULT_ACCENT } from "../constants";
+import type { AccentColor } from "../constants";
 import type { UserProfile, Team } from "../types";
 import { cn } from "@/lib/utils";
+import { ColorPicker } from "@/components/ui/color-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,6 +49,7 @@ export function UsersPage() {
   const [fPassword, setFPassword] = useState("");
   const [fRole, setFRole] = useState<"admin" | "user">("user");
   const [fTeamId, setFTeamId] = useState("");
+  const [fColor, setFColor] = useState<AccentColor>(DEFAULT_ACCENT);
   const [creating, setCreating] = useState(false);
 
   const load = useCallback(async () => {
@@ -77,6 +81,7 @@ export function UsersPage() {
     setFPassword("");
     setFRole("user");
     setFTeamId("");
+    setFColor(DEFAULT_ACCENT);
     setShowForm(false);
   };
 
@@ -97,6 +102,7 @@ export function UsersPage() {
           login: fLogin.trim(),
           role: fRole,
           team_id: fTeamId || null,
+          color: fColor,
         },
       },
     });
@@ -210,7 +216,11 @@ export function UsersPage() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-[auto_1fr_1fr_1fr] gap-3 items-end">
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] text-muted-foreground">Колір</Label>
+                  <ColorPicker value={fColor} onChange={setFColor} />
+                </div>
                 <div className="space-y-1.5">
                   <Label className="text-[11px] text-muted-foreground">Пароль *</Label>
                   <Input
@@ -305,17 +315,20 @@ export function UsersPage() {
                     isSeedAdmin(u.id) && "bg-accent/50",
                   )}
                 >
-                  <div>
-                    <div className="text-[13px] font-semibold text-foreground">
-                      {u.first_name} {u.last_name}
-                      {isSeedAdmin(u.id) && (
-                        <Badge variant="secondary" className="ml-1.5 align-middle text-[9px] font-bold">
-                          SYSTEM
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="mt-px text-[10px] text-muted-foreground">
-                      {new Date(u.created_at).toLocaleDateString("uk-UA")}
+                  <div className="flex items-center gap-2">
+                    <span className={cn("size-2.5 rounded-full shrink-0", getAccentDef(u.color).bg)} />
+                    <div>
+                      <div className="text-[13px] font-semibold text-foreground">
+                        {u.first_name} {u.last_name}
+                        {isSeedAdmin(u.id) && (
+                          <Badge variant="secondary" className="ml-1.5 align-middle text-[9px] font-bold">
+                            SYSTEM
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="mt-px text-[10px] text-muted-foreground">
+                        {new Date(u.created_at).toLocaleDateString("uk-UA")}
+                      </div>
                     </div>
                   </div>
 
