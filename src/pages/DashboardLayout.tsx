@@ -1,9 +1,13 @@
+import { FolderOpen, Loader2 } from "lucide-react";
 import { Header, Nav, ProjectBar } from "../components/layout";
+import { TabsContent } from "../components/layout/Nav";
 import { Dashboard } from "../components/dashboard/Dashboard";
 import { Goals } from "../components/goals/Goals";
 import { KPIPanel } from "../components/kpi/KPIPanel";
 import { Gantt } from "../components/gantt/Gantt";
+import { Button } from "../components/ui/button";
 import { useProject } from "../hooks/useProject";
+import { cn } from "@/lib/utils";
 
 export function DashboardLayout() {
   const {
@@ -12,14 +16,13 @@ export function DashboardLayout() {
     activeProjectId,
     tab,
     setTab,
-    expandedGoals,
+    openGoalIds,
+    setOpenGoalIds,
     expandedTasks,
     ganttExpanded,
     stats,
     ganttRange,
     ganttMonths,
-    toggleGoal,
-    isGoalOpen,
     toggleTask,
     toggleGanttGoal,
     addProject,
@@ -46,9 +49,14 @@ export function DashboardLayout() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 text-gray-500 text-sm">
+      <div
+        className={cn(
+          "min-h-screen flex items-center justify-center bg-background text-sm",
+          "text-muted-foreground",
+        )}
+      >
         <div className="flex flex-col items-center gap-3">
-          <div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+          <Loader2 className="size-6 animate-spin text-primary" />
           <span>Завантаження даних…</span>
         </div>
       </div>
@@ -58,8 +66,8 @@ export function DashboardLayout() {
   const hasProjects = projects.length > 0 && proj.id !== "";
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Header onAddProject={addProject} />
+    <div className="min-h-screen bg-background">
+      <Header />
 
       <ProjectBar
         projects={projects}
@@ -68,74 +76,82 @@ export function DashboardLayout() {
         onUpdateName={updateProjName}
         onUpdateDesc={updateProjDesc}
         onDelete={() => proj.id && deleteProject(proj.id)}
+        onAddProject={addProject}
       />
 
       {hasProjects ? (
         <>
-          <Nav tab={tab} onTabChange={setTab} />
+          <Nav tab={tab} onTabChange={setTab}>
+            <TabsContent value="dash">
+              <Dashboard proj={proj} stats={stats} />
+            </TabsContent>
 
-          {tab === "dash" && <Dashboard proj={proj} stats={stats} />}
+            <TabsContent value="goals">
+              <Goals
+                proj={proj}
+                kpiDefinitions={kpiDefinitions}
+                openGoalIds={openGoalIds}
+                onOpenGoalIdsChange={setOpenGoalIds}
+                expandedTasks={expandedTasks}
+                onAddGoal={addGoal}
+                onRemoveGoal={removeGoal}
+                onUpdateGoalField={updateGoalField}
+                onChangeGoalDates={changeGoalDates}
+                onAddKPI={addKPI}
+                onRemoveKPI={removeKPI}
+                onUpdateKPI={updateKPI}
+                onAddTask={addTask}
+                onRemoveTask={removeTask}
+                onUpdateTask={updateTask}
+                onToggleTask={toggleTask}
+                onAddLink={addLink}
+                onRemoveLink={removeLink}
+                onUpdateLink={updateLink}
+              />
+            </TabsContent>
 
-          {tab === "goals" && (
-            <Goals
-              proj={proj}
-              kpiDefinitions={kpiDefinitions}
-              expandedGoals={expandedGoals}
-              expandedTasks={expandedTasks}
-              onToggleGoal={toggleGoal}
-              isGoalOpen={isGoalOpen}
-              onAddGoal={addGoal}
-              onRemoveGoal={removeGoal}
-              onUpdateGoalField={updateGoalField}
-              onChangeGoalDates={changeGoalDates}
-              onAddKPI={addKPI}
-              onRemoveKPI={removeKPI}
-              onUpdateKPI={updateKPI}
-              onAddTask={addTask}
-              onRemoveTask={removeTask}
-              onUpdateTask={updateTask}
-              onToggleTask={toggleTask}
-              onAddLink={addLink}
-              onRemoveLink={removeLink}
-              onUpdateLink={updateLink}
-            />
-          )}
+            <TabsContent value="kpi">
+              <KPIPanel proj={proj} onUpdateKPI={updateKPI} />
+            </TabsContent>
 
-          {tab === "kpi" && <KPIPanel proj={proj} onUpdateKPI={updateKPI} />}
-
-          {tab === "gantt" && (
-            <Gantt
-              proj={proj}
-              ganttRange={ganttRange}
-              ganttMonths={ganttMonths}
-              ganttExpanded={ganttExpanded}
-              onToggleGoal={toggleGanttGoal}
-              onChangeGoalDates={changeGoalDates}
-              onChangeTaskDates={(gid, tid, field, val) =>
-                updateTask(gid, tid, (t) => ({ ...t, [field]: val }))
-              }
-            />
-          )}
+            <TabsContent value="gantt">
+              <Gantt
+                proj={proj}
+                ganttRange={ganttRange}
+                ganttMonths={ganttMonths}
+                ganttExpanded={ganttExpanded}
+                onToggleGoal={toggleGanttGoal}
+                onChangeGoalDates={changeGoalDates}
+                onChangeTaskDates={(gid, tid, field, val) =>
+                  updateTask(gid, tid, (t) => ({ ...t, [field]: val }))
+                }
+              />
+            </TabsContent>
+          </Nav>
         </>
       ) : (
-        <div className="flex flex-col items-center justify-center py-20 px-4 text-gray-500">
-          <div className="text-4xl mb-4">📊</div>
-          <div className="text-base font-bold text-gray-700 mb-2">
+        <div
+          className={cn(
+            "flex flex-col items-center justify-center py-20 px-4",
+            "text-muted-foreground",
+          )}
+        >
+          <FolderOpen className="size-16 mb-4 text-muted-foreground" />
+          <div className="text-base font-bold text-foreground mb-2">
             Немає проектів
           </div>
-          <div className="text-[13px] text-gray-400 mb-5">
+          <div className="text-[13px] text-muted-foreground mb-5">
             Створіть перший проект, щоб почати роботу
           </div>
-          <button
-            onClick={addProject}
-            className="px-7 py-2.5 text-sm font-bold text-white bg-green-700 rounded-xl cursor-pointer hover:bg-green-600 transition-colors"
-          >
+          <Button type="button" onClick={addProject}>
             ＋ Створити проект
-          </button>
+          </Button>
         </div>
       )}
 
-      <div className="text-center py-5 pb-7 text-[10px] text-gray-400">
+      <div
+        className={cn("text-center py-5 pb-7 text-[10px]", "text-muted-foreground")}
+      >
         Digital Marketing Dashboard v3.0
       </div>
     </div>

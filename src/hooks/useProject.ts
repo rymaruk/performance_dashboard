@@ -95,7 +95,7 @@ export function useProject() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActive] = useState<string>("");
   const [tab, setTab] = useState<TabKey>("dash");
-  const [expandedGoals, setExpandedGoals] = useState<Record<string, boolean>>({});
+  const [openGoalIds, setOpenGoalIds] = useState<string[]>([]);
   const [expandedTasks, setExpandedTasks] = useState<Record<string, boolean>>({});
   const [ganttExpanded, setGanttExpanded] = useState<Record<string, boolean>>({});
   const [kpiDefinitions, setKpiDefinitions] = useState<KpiDefinition[]>([]);
@@ -249,12 +249,6 @@ export function useProject() {
   );
 
   /* ─── UI toggles ─── */
-  const toggleGoal = (id: string) =>
-    setExpandedGoals((x) => ({
-      ...x,
-      [id]: x[id] === undefined ? false : !x[id],
-    }));
-  const isGoalOpen = (id: string) => expandedGoals[id] !== false;
   const toggleTask = (id: string) =>
     setExpandedTasks((x) => ({ ...x, [id]: !x[id] }));
   const toggleGanttGoal = (id: string) =>
@@ -401,6 +395,7 @@ export function useProject() {
     const ng: Goal = goalFromRow(data as GoalRow, [], []);
     ng.title = "Нова стратегічна ціль";
     updateLocalProj((p) => ({ ...p, goals: [...p.goals, ng] }));
+    setOpenGoalIds((prev) => [...prev, ng.id]);
   };
 
   const removeGoal = async (gid: string) => {
@@ -620,15 +615,14 @@ export function useProject() {
     activeProjectId,
     tab,
     setTab,
-    expandedGoals,
+    openGoalIds,
+    setOpenGoalIds,
     expandedTasks,
     ganttExpanded,
     stats,
     ganttRange,
     ganttMonths,
     kpiDefinitions,
-    toggleGoal,
-    isGoalOpen,
     toggleTask,
     toggleGanttGoal,
     addProject,

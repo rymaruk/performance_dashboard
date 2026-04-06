@@ -1,5 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../../hooks/AuthContext";
+import { Loader2 } from "lucide-react";
 
 interface Props {
   children: React.ReactNode;
@@ -11,9 +12,9 @@ export function ProtectedRoute({ children, adminOnly }: Props) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-500 text-sm">
+      <div className="min-h-screen flex items-center justify-center text-muted-foreground text-sm">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+          <Loader2 className="size-6 animate-spin text-primary" />
           <span>Завантаження…</span>
         </div>
       </div>

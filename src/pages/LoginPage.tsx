@@ -1,9 +1,29 @@
 import { useState, useEffect, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import clsx from "clsx";
+import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
 import { useAuth } from "../hooks/AuthContext";
 import { supabase } from "../lib/supabase";
 import type { Team } from "../types";
+
+const NO_TEAM_VALUE = "__none__";
 
 type Mode = "login" | "register";
 
@@ -66,175 +86,207 @@ export function LoginPage() {
     setBusy(false);
   };
 
-  const inputCls =
-    "w-full px-3.5 py-2.5 text-sm border border-gray-300 rounded-lg outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 transition-shadow";
+  const fieldLabelCls = "text-xs font-semibold text-muted-foreground";
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-900 to-purple-900">
-      <div className="w-[400px] max-w-[90vw] bg-white rounded-2xl px-8 py-9 shadow-2xl">
-        <div className="text-center mb-6">
-          <div className="text-[22px] font-extrabold text-primary-900">
+    <div className="min-h-screen flex items-center justify-center bg-background text-foreground p-4">
+      <Card className="w-full max-w-[400px] border-input shadow-lg">
+        <CardHeader className="text-center space-y-1">
+          <CardTitle className="text-[22px] font-extrabold tracking-tight">
             Performance Dashboard
-          </div>
-          <div className="text-xs text-gray-500 mt-1">
+          </CardTitle>
+          <CardDescription>
             {mode === "login" ? "Вхід в систему" : "Створити акаунт"}
-          </div>
-        </div>
+          </CardDescription>
+        </CardHeader>
 
-        {error && (
-          <div className="bg-red-50 text-red-700 px-3.5 py-2.5 rounded-lg text-xs mb-4 border-l-[3px] border-red-500">
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="bg-green-50 text-green-700 px-3.5 py-2.5 rounded-lg text-xs mb-4 border-l-[3px] border-green-500">
-            {success}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit}>
-          {mode === "register" && (
-            <>
-              <div className="flex gap-2.5 mb-3.5">
-                <div className="flex-1">
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">
-                    Імʼя
-                  </label>
-                  <input
-                    className={inputCls}
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    required
-                    placeholder="Андрій"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">
-                    Прізвище
-                  </label>
-                  <input
-                    className={inputCls}
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    required
-                    placeholder="Іваненко"
-                  />
-                </div>
-              </div>
-
-              <div className="mb-3.5">
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  Логін
-                </label>
-                <input
-                  className={inputCls}
-                  value={loginName}
-                  onChange={(e) => setLoginName(e.target.value)}
-                  required
-                  placeholder="andrii_iv"
-                />
-              </div>
-
-              <div className="mb-3.5">
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  Команда
-                </label>
-                <select
-                  className={clsx(inputCls, "cursor-pointer")}
-                  value={teamId}
-                  onChange={(e) => setTeamId(e.target.value)}
-                >
-                  <option value="">— Без команди —</option>
-                  {teams.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </>
+        <CardContent className="space-y-4">
+          {error && (
+            <div
+              className={cn(
+                "rounded-lg border border-destructive/20 px-3.5 py-2.5 text-xs",
+                "bg-destructive/10 text-destructive",
+              )}
+            >
+              {error}
+            </div>
           )}
 
-          <div className="mb-3.5">
-            <label className="block text-xs font-semibold text-gray-600 mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              className={inputCls}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="user@example.com"
-            />
-          </div>
+          {success && (
+            <div
+              className={cn(
+                "rounded-lg border border-success/20 px-3.5 py-2.5 text-xs",
+                "bg-success/10 text-success",
+              )}
+            >
+              {success}
+            </div>
+          )}
 
-          <div className="mb-5">
-            <label className="block text-xs font-semibold text-gray-600 mb-1">
-              Пароль
-            </label>
-            <input
-              type="password"
-              className={inputCls}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              placeholder="••••••••"
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-3.5">
+            {mode === "register" && (
+              <>
+                <div className="flex gap-2.5">
+                  <div className="flex-1 space-y-1">
+                    <Label htmlFor="firstName" className={fieldLabelCls}>
+                      Імʼя
+                    </Label>
+                    <Input
+                      id="firstName"
+                      className="border-input"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      required
+                      placeholder="Андрій"
+                    />
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <Label htmlFor="lastName" className={fieldLabelCls}>
+                      Прізвище
+                    </Label>
+                    <Input
+                      id="lastName"
+                      className="border-input"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      required
+                      placeholder="Іваненко"
+                    />
+                  </div>
+                </div>
 
-          <button
-            type="submit"
-            disabled={busy}
-            className={clsx(
-              "w-full py-3 text-sm font-bold text-white rounded-xl cursor-pointer transition-opacity",
-              busy
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-gradient-to-r from-primary-700 to-purple-700 hover:opacity-90",
+                <div className="space-y-1">
+                  <Label htmlFor="loginName" className={fieldLabelCls}>
+                    Логін
+                  </Label>
+                  <Input
+                    id="loginName"
+                    className="border-input"
+                    value={loginName}
+                    onChange={(e) => setLoginName(e.target.value)}
+                    required
+                    placeholder="andrii_iv"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="team" className={fieldLabelCls}>
+                    Команда
+                  </Label>
+                  <Select
+                    value={teamId || NO_TEAM_VALUE}
+                    onValueChange={(v) =>
+                      setTeamId(v === NO_TEAM_VALUE ? "" : v)
+                    }
+                  >
+                    <SelectTrigger
+                      id="team"
+                      className="w-full border-input"
+                    >
+                      <SelectValue placeholder="Оберіть команду" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_TEAM_VALUE}>
+                        — Без команди —
+                      </SelectItem>
+                      {teams.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
             )}
-          >
-            {busy
-              ? "Зачекайте…"
-              : mode === "login"
-                ? "Увійти"
-                : "Зареєструватися"}
-          </button>
-        </form>
 
-        <div className="text-center mt-4.5 text-xs text-gray-500">
-          {mode === "login" ? (
-            <>
-              Немає акаунту?{" "}
-              <button
-                onClick={() => {
-                  setMode("register");
-                  setError(null);
-                  setSuccess(null);
-                }}
-                className="bg-transparent border-none text-primary-700 cursor-pointer font-bold text-xs p-0"
-              >
-                Зареєструватися
-              </button>
-            </>
-          ) : (
-            <>
-              Вже є акаунт?{" "}
-              <button
-                onClick={() => {
-                  setMode("login");
-                  setError(null);
-                  setSuccess(null);
-                }}
-                className="bg-transparent border-none text-primary-700 cursor-pointer font-bold text-xs p-0"
-              >
-                Увійти
-              </button>
-            </>
-          )}
-        </div>
-      </div>
+            <div className="space-y-1">
+              <Label htmlFor="email" className={fieldLabelCls}>
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                className="border-input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="user@example.com"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="password" className={fieldLabelCls}>
+                Пароль
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                className="border-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                placeholder="••••••••"
+              />
+            </div>
+
+            <Button
+              type="submit"
+              disabled={busy}
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+              size="lg"
+            >
+              {busy ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                  Зачекайте…
+                </>
+              ) : mode === "login" ? (
+                "Увійти"
+              ) : (
+                "Зареєструватися"
+              )}
+            </Button>
+          </form>
+
+          <div className="text-center text-xs text-muted-foreground pt-1">
+            {mode === "login" ? (
+              <>
+                Немає акаунту?{" "}
+                <Button
+                  type="button"
+                  variant="link"
+                  className="h-auto p-0 text-xs font-bold text-primary"
+                  onClick={() => {
+                    setMode("register");
+                    setError(null);
+                    setSuccess(null);
+                  }}
+                >
+                  Зареєструватися
+                </Button>
+              </>
+            ) : (
+              <>
+                Вже є акаунт?{" "}
+                <Button
+                  type="button"
+                  variant="link"
+                  className="h-auto p-0 text-xs font-bold text-primary"
+                  onClick={() => {
+                    setMode("login");
+                    setError(null);
+                    setSuccess(null);
+                  }}
+                >
+                  Увійти
+                </Button>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

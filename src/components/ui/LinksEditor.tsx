@@ -1,5 +1,8 @@
 import { Editable } from "./Editable";
+import { Button } from "./button";
+import { Tooltip, TooltipTrigger, TooltipContent } from "./tooltip";
 import { useConfirmAction } from "../../hooks/ConfirmContext";
+import { X, ExternalLink, Link as LinkIcon } from "lucide-react";
 import type { Link } from "../../types";
 
 interface LinksEditorProps {
@@ -14,13 +17,17 @@ export function LinksEditor({ links, onAdd, onRemove, onUpdate }: LinksEditorPro
   return (
     <div className="mt-1.5">
       <div className="flex items-center gap-1.5 mb-1">
-        <span className="text-[11px] font-semibold text-gray-600">🔗 Посилання</span>
-        <button
+        <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+          <LinkIcon className="size-3" /> Посилання
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
           onClick={onAdd}
-          className="bg-transparent border border-dashed border-gray-400 rounded px-2 py-px text-[11px] cursor-pointer text-primary-700 hover:border-primary-500 transition-colors"
+          className="h-6 px-2 text-[11px] border-dashed"
         >
           + додати
-        </button>
+        </Button>
       </div>
 
       {links.map((lk) => (
@@ -34,31 +41,42 @@ export function LinksEditor({ links, onAdd, onRemove, onUpdate }: LinksEditorPro
           <Editable
             value={lk.url}
             onChange={(v) => onUpdate(lk.id, { ...lk, url: String(v) })}
-            className="text-[11px] text-primary-700 flex-1 break-all"
+            className="text-[11px] text-primary flex-1 break-all"
             placeholder="https://..."
           />
           {lk.url && (
-            <a
-              href={lk.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[10px] text-primary-500 hover:text-primary-700"
-            >
-              ↗
-            </a>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <a
+                  href={lk.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground hover:text-foreground inline-flex"
+                >
+                  <ExternalLink className="size-3" />
+                </a>
+              </TooltipTrigger>
+              <TooltipContent>Відкрити посилання</TooltipContent>
+            </Tooltip>
           )}
-          <button
-            onClick={() =>
-              confirm(
-                `Видалити посилання «${lk.label || lk.url || "без назви"}»?`,
-                () => onRemove(lk.id),
-              )
-            }
-            className="bg-transparent border-none cursor-pointer text-red-500 text-xs px-1.5 py-0.5 leading-none hover:text-red-700"
-            title="Видалити посилання"
-          >
-            ✕
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-5 text-destructive hover:text-destructive/80 hover:bg-destructive/10"
+                onClick={() =>
+                  confirm(
+                    `Видалити посилання «${lk.label || lk.url || "без назви"}»?`,
+                    () => onRemove(lk.id),
+                  )
+                }
+              >
+                <X className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Видалити посилання</TooltipContent>
+          </Tooltip>
         </div>
       ))}
     </div>

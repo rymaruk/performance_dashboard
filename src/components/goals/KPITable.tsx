@@ -1,7 +1,27 @@
 import { useMemo } from "react";
-import clsx from "clsx";
-import { Editable, Progress } from "../ui";
+import { cn } from "@/lib/utils";
+import { Editable } from "../ui";
+import { ProgressBar } from "../ui/progress-bar";
+import { Button } from "../ui/button";
+import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "../ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 import { useConfirmAction } from "../../hooks/ConfirmContext";
+import { X, BarChart3, Plus } from "lucide-react";
 import type { KPI, KpiDefinition } from "../../types";
 
 interface KPITableProps {
@@ -29,77 +49,85 @@ export function KPITable({ kpis, kpiDefinitions, onAdd, onRemove, onUpdate }: KP
   return (
     <div className="mb-4">
       <div className="flex justify-between items-center mb-2">
-        <span className="text-xs font-bold text-gray-700">📈 KPI показники</span>
+        <span className="text-xs font-bold text-foreground flex items-center gap-1">
+          <BarChart3 className="size-3.5" /> KPI показники
+        </span>
         {available.length > 0 ? (
-          <select
-            onChange={(e) => {
-              if (e.target.value) {
-                onAdd(e.target.value);
-                e.target.value = "";
-              }
-            }}
-            defaultValue=""
-            className="px-2.5 py-1 text-[11px] border border-teal-500 text-teal-700 rounded-lg cursor-pointer bg-teal-50 font-semibold focus:ring-2 focus:ring-teal-200 outline-none"
-          >
-            <option value="" disabled>＋ Додати KPI…</option>
-            {available.map((d) => (
-              <option key={d.id} value={d.id}>{d.name} ({d.unit})</option>
-            ))}
-          </select>
+          <Select onValueChange={(v) => onAdd(v)}>
+            <SelectTrigger size="sm" className="h-7 gap-1 bg-accent text-[11px] font-semibold">
+              <Plus className="size-3" />
+              <SelectValue placeholder="Додати KPI…" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {available.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name} ({d.unit})
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         ) : (
-          <span className="text-[10px] text-gray-400">
+          <span className="text-[10px] text-muted-foreground">
             {kpiDefinitions.length === 0 ? "Спочатку створіть KPI показники" : "Усі KPI вже додані"}
           </span>
         )}
       </div>
 
       {kpis.length > 0 && (
-        <table className="w-full border-collapse text-xs">
-          <thead>
-            <tr className="bg-gray-100">
+        <Table className="text-xs">
+          <TableHeader>
+            <TableRow className="bg-muted hover:bg-muted">
               {["Показник", "Поточне", "Ціль", "Од.", "Прогрес", ""].map((h, i) => (
-                <th key={i} className="px-2 py-1.5 text-left text-[11px] font-semibold text-gray-600">
+                <TableHead key={i} className="h-8 text-[11px] font-semibold">
                   {h}
-                </th>
+                </TableHead>
               ))}
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {kpis.map((k) => (
-              <tr key={k.id} className="border-b border-gray-200">
-                <td className="px-2 py-1.5">
-                  <span className="font-medium text-gray-800">{k.name}</span>
-                </td>
-                <td className="px-2 py-1.5">
+              <TableRow key={k.id}>
+                <TableCell>
+                  <span className="font-medium text-foreground">{k.name}</span>
+                </TableCell>
+                <TableCell>
                   <Editable
                     value={k.current}
                     onChange={(v) => onUpdate(k.id, (kk) => ({ ...kk, current: Number(v) }))}
                     type="number"
-                    className={clsx("font-bold", k.current >= k.target ? "text-green-700" : "text-orange-700")}
+                    className={cn("font-bold", k.current >= k.target ? "text-success" : "text-chart-5")}
                   />
-                </td>
-                <td className="px-2 py-1.5">
+                </TableCell>
+                <TableCell>
                   <Editable value={k.target} onChange={(v) => onUpdate(k.id, (kk) => ({ ...kk, target: Number(v) }))} type="number" />
-                </td>
-                <td className="px-2 py-1.5">
-                  <span className="text-[11px] text-gray-500">{k.unit}</span>
-                </td>
-                <td className="px-2 py-1.5 w-[110px]">
-                  <Progress current={k.current} target={k.target} colorClass={k.current >= k.target ? "bg-green-500" : "bg-primary-500"} />
-                </td>
-                <td className="px-2 py-1.5">
-                  <button
-                    onClick={() => confirm(`Відʼєднати KPI «${k.name || "без назви"}» від цілі?`, () => onRemove(k.id))}
-                    className="bg-transparent border-none cursor-pointer text-red-500 text-[13px] px-1.5 py-0.5 leading-none hover:text-red-700"
-                    title="Відʼєднати KPI"
-                  >
-                    ✕
-                  </button>
-                </td>
-              </tr>
+                </TableCell>
+                <TableCell>
+                  <span className="text-[11px] text-muted-foreground">{k.unit}</span>
+                </TableCell>
+                <TableCell className="w-[110px]">
+                  <ProgressBar current={k.current} target={k.target} colorClass={k.current >= k.target ? "bg-success" : "bg-primary"} />
+                </TableCell>
+                <TableCell>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-6 text-destructive hover:text-destructive/80 hover:bg-destructive/10"
+                        onClick={() => confirm(`Відʼєднати KPI «${k.name || "без назви"}» від цілі?`, () => onRemove(k.id))}
+                      >
+                        <X className="size-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Відʼєднати KPI</TooltipContent>
+                  </Tooltip>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
     </div>
   );

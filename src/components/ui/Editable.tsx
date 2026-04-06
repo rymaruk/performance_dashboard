@@ -1,6 +1,15 @@
 import { useState, useRef, type ElementType } from "react";
-import { CustomSelect } from "./CustomSelect";
-import clsx from "clsx";
+import { cn } from "@/lib/utils";
+import { Input } from "./input";
+import { Textarea } from "./textarea";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./select";
 
 interface EditableProps {
   value: string | number;
@@ -33,35 +42,41 @@ export function Editable({
 
   if (options && editing) {
     return (
-      <>
-        <Tag
-          ref={labelRef}
+      <Select
+        value={String(value)}
+        onValueChange={(val) => {
+          setV(val);
+          onChange(val);
+          setEditing(false);
+        }}
+        open
+        onOpenChange={(open) => {
+          if (!open) setEditing(false);
+        }}
+      >
+        <SelectTrigger
+          size="sm"
+          className={cn("h-auto min-h-0 border-primary px-2 py-0.5 text-inherit", className)}
           onClick={(e: React.MouseEvent) => e.stopPropagation()}
-          className={clsx(
-            "cursor-pointer border-b border-dashed border-primary-500 min-w-[20px] inline-block",
-            className,
-          )}
         >
-          {String(value)}
-        </Tag>
-        <CustomSelect
-          value={String(value)}
-          options={options}
-          triggerRef={labelRef}
-          onSelect={(val) => {
-            setV(val);
-            onChange(val);
-            setEditing(false);
-          }}
-          onClose={() => setEditing(false)}
-        />
-      </>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {options.map((opt) => (
+              <SelectItem key={opt} value={opt}>
+                {opt}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
     );
   }
 
   if (editing) {
     return (
-      <input
+      <Input
         type={type}
         value={String(v)}
         autoFocus
@@ -71,8 +86,8 @@ export function Editable({
         onKeyDown={(e) => {
           if (e.key === "Enter") save();
         }}
-        className={clsx(
-          "border border-primary-500 rounded bg-primary-50 px-1.5 py-0.5 outline-none text-inherit font-inherit",
+        className={cn(
+          "h-auto border-ring bg-accent px-1.5 py-0.5 text-inherit",
           type === "number" ? "w-[70px]" : "w-full",
           className,
         )}
@@ -83,8 +98,8 @@ export function Editable({
   return (
     <Tag
       ref={options ? labelRef : undefined}
-      className={clsx(
-        "cursor-pointer border-b border-dashed border-gray-300 min-w-[20px] inline-block hover:border-primary-500 transition-colors",
+      className={cn(
+        "cursor-pointer border-b border-dashed border-border min-w-[20px] inline-block hover:border-primary transition-colors",
         className,
       )}
       onClick={(e: React.MouseEvent) => {
@@ -97,7 +112,7 @@ export function Editable({
       {value !== undefined && value !== "" && value !== null ? (
         String(value)
       ) : (
-        <span className="text-gray-400">{placeholder}</span>
+        <span className="text-muted-foreground">{placeholder}</span>
       )}
     </Tag>
   );
@@ -119,7 +134,7 @@ export function EditableArea({
 
   if (editing) {
     return (
-      <textarea
+      <Textarea
         value={v}
         autoFocus
         rows={3}
@@ -129,16 +144,16 @@ export function EditableArea({
           onChange(v);
           setEditing(false);
         }}
-        className="w-full border border-primary-500 rounded bg-primary-50 px-1.5 py-1 outline-none text-xs font-inherit resize-y"
+        className="border-ring bg-accent px-1.5 py-1 text-xs resize-y"
       />
     );
   }
 
   return (
     <div
-      className={clsx(
-        "cursor-pointer border-b border-dashed border-gray-300 text-xs min-h-[20px] whitespace-pre-wrap leading-relaxed hover:border-primary-500 transition-colors",
-        value ? "text-gray-700" : "text-gray-400",
+      className={cn(
+        "cursor-pointer border-b border-dashed border-border text-xs min-h-[20px] whitespace-pre-wrap leading-relaxed hover:border-primary transition-colors",
+        value ? "text-foreground" : "text-muted-foreground",
       )}
       onClick={(e) => {
         e.stopPropagation();

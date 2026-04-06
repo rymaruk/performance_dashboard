@@ -1,86 +1,175 @@
 @import "tailwindcss";
+@import "@fontsource-variable/instrument-sans";
 
-@theme {
-  --font-sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+@plugin "tailwindcss-animate";
 
-  /* Blue (primary) */
-  --color-primary-50: #E3F2FD;
-  --color-primary-100: #BBDEFB;
-  --color-primary-200: #90CAF9;
-  --color-primary-500: #2196F3;
-  --color-primary-600: #1E88E5;
-  --color-primary-700: #1976D2;
-  --color-primary-900: #0D47A1;
+@custom-variant dark (&:is(.dark *));
 
-  /* Green */
-  --color-green-50: #E8F5E9;
-  --color-green-100: #C8E6C9;
-  --color-green-500: #4CAF50;
-  --color-green-700: #388E3C;
-  --color-green-900: #1B5E20;
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: 'Instrument Sans Variable', sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 
-  /* Orange */
-  --color-orange-50: #FFF3E0;
-  --color-orange-100: #FFE0B2;
-  --color-orange-500: #FF9800;
-  --color-orange-700: #F57C00;
-  --color-orange-900: #E65100;
+  --color-success: oklch(0.60 0.17 145);
+  --color-success-foreground: oklch(0.98 0 0);
+  --color-warning: oklch(0.75 0.15 75);
+  --color-warning-foreground: oklch(0.20 0.05 75);
+  --color-info: oklch(0.62 0.17 250);
+  --color-info-foreground: oklch(0.98 0 0);
 
-  /* Purple */
-  --color-purple-50: #F3E5F5;
-  --color-purple-100: #E1BEE7;
-  --color-purple-500: #9C27B0;
-  --color-purple-700: #7B1FA2;
-  --color-purple-900: #4A148C;
-
-  /* Red */
-  --color-red-50: #FFEBEE;
-  --color-red-100: #FFCDD2;
-  --color-red-500: #F44336;
-  --color-red-600: #E53935;
-  --color-red-700: #D32F2F;
-
-  /* Teal */
-  --color-teal-50: #E0F2F1;
-  --color-teal-500: #009688;
-  --color-teal-700: #00796B;
-
-  /* Gray */
-  --color-gray-50: #FAFAFA;
-  --color-gray-100: #F5F5F5;
-  --color-gray-200: #EEEEEE;
-  --color-gray-300: #E0E0E0;
-  --color-gray-400: #BDBDBD;
-  --color-gray-500: #9E9E9E;
-  --color-gray-600: #757575;
-  --color-gray-700: #616161;
-  --color-gray-800: #424242;
-  --color-gray-900: #212121;
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
 }
 
-*, *::before, *::after { box-sizing: border-box; }
-body { margin: 0; font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
-#root { min-height: 100vh; }
+@keyframes accordion-down {
+  from { height: 0; }
+  to { height: var(--radix-accordion-content-height); }
+}
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to { height: 0; }
+}
 
-/* react-datepicker inline tooltip overrides */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.148 0.004 228.8);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.148 0.004 228.8);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.148 0.004 228.8);
+  --primary: oklch(0.488 0.243 264.376);
+  --primary-foreground: oklch(0.97 0.014 254.604);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.963 0.002 197.1);
+  --muted-foreground: oklch(0.56 0.021 213.5);
+  --accent: oklch(0.963 0.002 197.1);
+  --accent-foreground: oklch(0.218 0.008 223.9);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.925 0.005 214.3);
+  --input: oklch(0.925 0.005 214.3);
+  --ring: oklch(0.723 0.014 214.4);
+  --chart-1: oklch(0.845 0.143 164.978);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.596 0.145 163.225);
+  --chart-4: oklch(0.508 0.118 165.612);
+  --chart-5: oklch(0.432 0.095 166.913);
+  --radius: 0.875rem;
+  --sidebar: oklch(0.987 0.002 197.1);
+  --sidebar-foreground: oklch(0.148 0.004 228.8);
+  --sidebar-primary: oklch(0.546 0.245 262.881);
+  --sidebar-primary-foreground: oklch(0.97 0.014 254.604);
+  --sidebar-accent: oklch(0.963 0.002 197.1);
+  --sidebar-accent-foreground: oklch(0.218 0.008 223.9);
+  --sidebar-border: oklch(0.925 0.005 214.3);
+  --sidebar-ring: oklch(0.723 0.014 214.4);
+}
+
+.dark {
+  --background: oklch(0.148 0.004 228.8);
+  --foreground: oklch(0.987 0.002 197.1);
+  --card: oklch(0.218 0.008 223.9);
+  --card-foreground: oklch(0.987 0.002 197.1);
+  --popover: oklch(0.218 0.008 223.9);
+  --popover-foreground: oklch(0.987 0.002 197.1);
+  --primary: oklch(0.424 0.199 265.638);
+  --primary-foreground: oklch(0.97 0.014 254.604);
+  --secondary: oklch(0.274 0.006 286.033);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.275 0.011 216.9);
+  --muted-foreground: oklch(0.723 0.014 214.4);
+  --accent: oklch(0.275 0.011 216.9);
+  --accent-foreground: oklch(0.987 0.002 197.1);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.56 0.021 213.5);
+  --chart-1: oklch(0.845 0.143 164.978);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.596 0.145 163.225);
+  --chart-4: oklch(0.508 0.118 165.612);
+  --chart-5: oklch(0.432 0.095 166.913);
+  --sidebar: oklch(0.218 0.008 223.9);
+  --sidebar-foreground: oklch(0.987 0.002 197.1);
+  --sidebar-primary: oklch(0.623 0.214 259.815);
+  --sidebar-primary-foreground: oklch(0.97 0.014 254.604);
+  --sidebar-accent: oklch(0.275 0.011 216.9);
+  --sidebar-accent-foreground: oklch(0.987 0.002 197.1);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.56 0.021 213.5);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+  #root {
+    min-height: 100vh;
+  }
+}
+
+/* react-datepicker overrides */
 .dp-tooltip-cal {
   font-size: 12px !important;
   border: none !important;
   font-family: var(--font-sans) !important;
 }
 .dp-tooltip-cal .react-datepicker__header {
-  background: var(--color-gray-100) !important;
-  border-bottom: 1px solid var(--color-gray-300) !important;
+  background: var(--color-muted) !important;
+  border-bottom: 1px solid var(--color-border) !important;
   padding-top: 8px !important;
 }
 .dp-tooltip-cal .react-datepicker__current-month {
   font-size: 12px !important;
   font-weight: 700 !important;
-  color: var(--color-gray-900) !important;
+  color: var(--color-foreground) !important;
 }
 .dp-tooltip-cal .react-datepicker__day-name {
   font-size: 10px !important;
-  color: var(--color-gray-500) !important;
+  color: var(--color-muted-foreground) !important;
   width: 28px !important;
   line-height: 28px !important;
 }
@@ -92,15 +181,16 @@ body { margin: 0; font-family: var(--font-sans); -webkit-font-smoothing: antiali
   margin: 1px !important;
 }
 .dp-tooltip-cal .react-datepicker__day--selected {
-  background: var(--color-primary-700) !important;
-  color: #fff !important;
+  background: var(--color-primary) !important;
+  color: var(--color-primary-foreground) !important;
   font-weight: 700 !important;
 }
 .dp-tooltip-cal .react-datepicker__day:hover {
-  background: var(--color-primary-50) !important;
+  background: var(--color-accent) !important;
 }
 .dp-tooltip-cal .react-datepicker__day--disabled {
-  color: var(--color-gray-300) !important;
+  color: var(--color-muted-foreground) !important;
+  opacity: 0.4;
 }
 .dp-tooltip-cal .react-datepicker__navigation {
   top: 8px !important;

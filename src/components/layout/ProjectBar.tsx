@@ -1,6 +1,31 @@
-import clsx from "clsx";
-import { Editable } from "../ui";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
+import { Label } from "../ui/label";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemTitle,
+  ItemMedia,
+} from "../ui/item";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "../ui/hover-card";
 import { useConfirmAction } from "../../hooks/ConfirmContext";
+import { FolderOpen, Pencil, Plus, Trash2 } from "lucide-react";
 import type { Project } from "../../types";
 
 interface ProjectBarProps {
@@ -10,6 +35,7 @@ interface ProjectBarProps {
   onUpdateName: (v: string) => void;
   onUpdateDesc: (v: string) => void;
   onDelete: () => void;
+  onAddProject: () => void;
 }
 
 export function ProjectBar({
@@ -19,69 +45,151 @@ export function ProjectBar({
   onUpdateName,
   onUpdateDesc,
   onDelete,
+  onAddProject,
 }: ProjectBarProps) {
   const confirm = useConfirmAction();
   const proj = projects.find((p) => p.id === activeProjectId);
+  const [open, setOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+
+  function handleOpen() {
+    if (proj) {
+      setEditName(proj.name);
+      setEditDesc(proj.desc);
+    }
+    setOpen(true);
+  }
+
+  function handleSave() {
+    onUpdateName(editName);
+    onUpdateDesc(editDesc);
+    setOpen(false);
+  }
 
   return (
-    <>
-      {/* Project pills */}
-      <div className="bg-white border-b border-gray-200 px-4 py-2 flex gap-2 items-center overflow-x-auto flex-wrap">
-        <span className="text-[11px] font-bold text-gray-500">ПРОЕКТИ:</span>
-        {projects.length === 0 && (
-          <span className="text-xs text-gray-400">
-            Немає проектів — додайте перший
-          </span>
-        )}
-        {projects.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => onSwitch(p.id)}
-            className={clsx(
-              "px-3.5 py-1.5 text-xs rounded-full cursor-pointer whitespace-nowrap transition-colors border",
-              p.id === activeProjectId
-                ? "font-bold text-white bg-primary-700 border-primary-700"
-                : "font-medium text-gray-700 bg-transparent border-gray-300 hover:border-gray-400 hover:bg-gray-50",
-            )}
-          >
-            {p.name}
-          </button>
-        ))}
-      </div>
-
-      {/* Active project meta */}
-      {proj && (
-        <div className="bg-white px-4 py-2 border-b border-gray-200 flex items-center gap-3 flex-wrap">
-          <span className="text-[11px] text-gray-500">Назва:</span>
-          <Editable
-            value={proj.name}
-            onChange={(v) => onUpdateName(String(v))}
-            className="font-bold text-sm text-gray-900"
-            placeholder="Назва"
-          />
-          <span className="text-[11px] text-gray-500">Опис:</span>
-          <Editable
-            value={proj.desc}
-            onChange={(v) => onUpdateDesc(String(v))}
-            className="text-xs text-gray-700 flex-1"
-            placeholder="Опис"
-          />
-          {projects.length > 1 && (
-            <button
-              onClick={() =>
-                confirm(
-                  `Видалити проект «${proj.name || "без назви"}»?`,
-                  onDelete,
-                )
-              }
-              className="bg-transparent border-none cursor-pointer text-red-500 text-[13px] font-semibold px-2 py-0.5 leading-none hover:text-red-700"
-              title="Видалити проект"
-            >
-              ✕ Видалити
-            </button>
-          )}
-        </div>
+    <div className="bg-card border-b border-border px-4 py-2 flex items-center gap-2 overflow-x-auto">
+      {projects.length === 0 && (
+        <span className="text-xs text-muted-foreground">
+          Немає проектів — додайте перший
+        </span>
       )}
-    </>
+
+      {projects.map((p) => {
+        const isActive = p.id === activeProjectId;
+        return (
+          <HoverCard key={p.id} openDelay={200} closeDelay={100}>
+            <HoverCardTrigger asChild>
+              <button
+                onClick={() => onSwitch(p.id)}
+                className="text-left focus:outline-none"
+              >
+                <Item
+                  variant={isActive ? "default" : "outline"}
+                  size="sm"
+                  className={cn(
+                    "cursor-pointer rounded-lg px-2 py-1 items-center transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "hover:bg-accent",
+                  )}
+                >
+                  <ItemMedia>
+                    <FolderOpen className="size-4" />
+                  </ItemMedia>
+                  <ItemContent>
+                    <ItemTitle className={cn("text-xs", isActive && "font-bold")}>
+                      {p.name}
+                    </ItemTitle>
+                  </ItemContent>
+                  {isActive && (
+                    <ItemActions>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-6 text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                        onClick={(e) => { e.stopPropagation(); handleOpen(); }}
+                      >
+                        <Pencil className="size-3" />
+                      </Button>
+                    </ItemActions>
+                  )}
+                </Item>
+              </button>
+            </HoverCardTrigger>
+            <HoverCardContent className="flex w-72 flex-col gap-1">
+              <div className="font-semibold">{p.name}</div>
+              <div className="text-sm text-muted-foreground">
+                {p.desc || "Без опису"}
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                Цілей: {p.goals.length} · Задач: {p.goals.reduce((a, g) => a + g.tasks.length, 0)}
+              </div>
+            </HoverCardContent>
+          </HoverCard>
+        );
+      })}
+
+      <Button onClick={onAddProject} size="sm" className="ml-auto shrink-0">
+        <Plus className="size-3.5" /> Проект
+      </Button>
+
+      {proj && (
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Редагувати проект</DialogTitle>
+              <DialogDescription>
+                Змініть назву та опис проекту. Натисніть «Зберегти» для підтвердження.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-2">
+              <div className="grid gap-2">
+                <Label htmlFor="proj-name">Назва проекту</Label>
+                <Input
+                  id="proj-name"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Назва проекту"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="proj-desc">Опис</Label>
+                <Textarea
+                  id="proj-desc"
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  placeholder="Короткий опис проекту"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              {projects.length > 1 && (
+                <Button
+                  variant="destructive"
+                  className="mr-auto"
+                  onClick={() => {
+                    setOpen(false);
+                    confirm(
+                      `Видалити проект «${proj.name || "без назви"}»?`,
+                      onDelete,
+                    );
+                  }}
+                >
+                  <Trash2 className="size-3.5" /> Видалити
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => setOpen(false)}>
+                Скасувати
+              </Button>
+              <Button onClick={handleSave}>
+                Зберегти
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
   );
 }

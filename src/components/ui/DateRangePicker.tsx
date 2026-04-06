@@ -3,7 +3,8 @@ import { createPortal } from "react-dom";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { medDate, shortDate } from "../../utils/date";
-import clsx from "clsx";
+import { cn } from "@/lib/utils";
+import { Button } from "./button";
 
 interface DateRangePickerProps {
   startDate: string;
@@ -92,43 +93,42 @@ export function DateRangePicker({
 
   return (
     <>
-      <button
+      <Button
         ref={triggerRef}
+        variant={isGantt ? "ghost" : "outline"}
         onClick={(e) => {
           e.stopPropagation();
           setOpen((o) => !o);
         }}
-        className={clsx(
-          "inline-flex items-center cursor-pointer whitespace-nowrap",
+        className={cn(
+          "inline-flex items-center whitespace-nowrap h-auto",
           isGantt
-            ? "gap-0.5 p-0 text-[8px] font-bold text-white bg-transparent border-none leading-none opacity-90 hover:opacity-100 [text-shadow:0_1px_2px_rgba(0,0,0,0.3)]"
-            : clsx(
-                "font-semibold bg-white border rounded-md transition-all",
+            ? "gap-0.5 p-0 text-[8px] font-bold text-primary-foreground bg-transparent border-none leading-none opacity-90 hover:opacity-100 hover:bg-transparent [text-shadow:0_1px_2px_rgba(0,0,0,0.3)]"
+            : cn(
+                "font-semibold",
                 isSm ? "gap-0.5 px-2 py-0.5 text-[10px]" : "gap-1 px-2.5 py-1 text-[11px]",
-                open
-                  ? "border-primary-500 ring-2 ring-primary-100 text-gray-700"
-                  : "border-gray-300 text-gray-700 hover:border-gray-400",
+                open && "border-ring ring-2 ring-ring/50",
               ),
         )}
       >
         {!isGantt && <span className={isSm ? "text-[9px]" : "text-[10px]"}>📅</span>}
         <span>{isGantt ? shortDate(startDate) : medDate(startDate)}</span>
-        <span className={isGantt ? "text-white/60" : "text-gray-400"}>
+        <span className={isGantt ? "text-primary-foreground/60" : "text-muted-foreground"}>
           {isGantt ? "–" : "→"}
         </span>
         <span>{isGantt ? shortDate(endDate) : medDate(endDate)}</span>
-      </button>
+      </Button>
 
       {open &&
         createPortal(
           <div
             ref={tooltipRef}
             onClick={(e) => e.stopPropagation()}
-            className="absolute z-[10000] bg-white rounded-xl shadow-2xl border border-gray-200 p-3.5 flex gap-4 items-start"
+            className="absolute z-[10000] bg-popover rounded-xl shadow-2xl border border-border p-3.5 flex gap-4 items-start"
             style={{ top: pos.top, left: pos.left }}
           >
             <div>
-              <div className="text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wide">
+              <div className="text-[10px] font-bold text-muted-foreground mb-1.5 uppercase tracking-wide">
                 Початок
               </div>
               <DatePicker
@@ -144,7 +144,7 @@ export function DateRangePicker({
             </div>
 
             <div>
-              <div className="text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wide">
+              <div className="text-[10px] font-bold text-muted-foreground mb-1.5 uppercase tracking-wide">
                 Кінець
               </div>
               <DatePicker

@@ -1,10 +1,26 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import clsx from "clsx";
+import { ChevronRight, Loader2, Plus } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/AuthContext";
 import { useConfirmAction } from "../hooks/ConfirmContext";
 import type { KpiDefinition } from "../types";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
+import { SidebarPageLayout } from "../components/layout/SidebarPageLayout";
 
 interface GoalUsage {
   goal_id: string;
@@ -160,73 +176,86 @@ export function KpiManagePage() {
     load();
   };
 
-  return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="bg-gradient-to-r from-primary-900 to-teal-900 text-white px-6 pt-4.5 pb-3.5 flex justify-between items-center flex-wrap gap-2">
-        <div>
-          <div className="text-lg font-bold">📈 Управління KPI показниками</div>
-          <div className="text-xs opacity-70">Базовий список KPI, використання у цілях</div>
-        </div>
-        <button
-          onClick={() => navigate("/")}
-          className="px-4 py-1.5 text-xs font-semibold text-white bg-white/15 border border-white/30 rounded-lg cursor-pointer hover:bg-white/25 transition-colors"
-        >
-          ← Назад
-        </button>
-      </div>
+  const inputInlineClass = "h-8 text-[13px]";
 
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        {/* Create new KPI */}
-        <div className="bg-white rounded-xl p-5 mb-5 shadow-sm">
-          <div className="text-sm font-bold text-gray-800 mb-3">Створити новий KPI показник</div>
-          <div className="grid grid-cols-[1fr_80px_80px] gap-2.5 mb-2.5">
-            <input
-              className="px-3.5 py-2 text-[13px] border border-gray-300 rounded-lg outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 transition-shadow"
-              placeholder="Назва KPI *"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-            />
-            <input
-              className="px-3 py-2 text-[13px] border border-gray-300 rounded-lg outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 transition-shadow"
-              placeholder="Одиниця"
-              value={newUnit}
-              onChange={(e) => setNewUnit(e.target.value)}
-            />
-            <input
-              className="px-3 py-2 text-[13px] border border-gray-300 rounded-lg outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 transition-shadow"
-              placeholder="Ціль"
-              type="number"
-              value={newTarget}
-              onChange={(e) => setNewTarget(e.target.value)}
-            />
-          </div>
-          <div className="flex gap-2.5">
-            <input
-              className="flex-1 px-3.5 py-2 text-[13px] border border-gray-300 rounded-lg outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 transition-shadow"
-              placeholder="Опис (необовʼязково)"
-              value={newDesc}
-              onChange={(e) => setNewDesc(e.target.value)}
-            />
-            <button
-              onClick={handleAdd}
-              className="px-5 py-2 text-[13px] font-bold text-white bg-teal-700 rounded-lg cursor-pointer whitespace-nowrap hover:bg-teal-600 transition-colors"
-            >
-              + Створити
-            </button>
-          </div>
-        </div>
+  return (
+    <SidebarPageLayout
+      title="Управління KPI показниками"
+      subtitle="Базовий список KPI, використання у цілях"
+    >
+      <div className="mx-auto max-w-4xl px-4 py-6">
+        <Card className="mb-5 py-5">
+          <CardContent className="space-y-3 px-5 pt-0">
+            <div className="text-sm font-semibold text-foreground">Створити новий KPI показник</div>
+            <div className="grid grid-cols-[1fr_80px_80px] gap-2.5">
+              <div className="space-y-1">
+                <Label htmlFor="kpi-name" className="text-[11px] text-muted-foreground">Назва *</Label>
+                <Input
+                  id="kpi-name"
+                  className={inputInlineClass}
+                  placeholder="Назва KPI"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="kpi-unit" className="text-[11px] text-muted-foreground">Одиниця</Label>
+                <Input
+                  id="kpi-unit"
+                  className={inputInlineClass}
+                  placeholder="%"
+                  value={newUnit}
+                  onChange={(e) => setNewUnit(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="kpi-target" className="text-[11px] text-muted-foreground">Ціль</Label>
+                <Input
+                  id="kpi-target"
+                  className={inputInlineClass}
+                  placeholder="100"
+                  type="number"
+                  value={newTarget}
+                  onChange={(e) => setNewTarget(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2.5">
+              <div className="flex-1 space-y-1">
+                <Label htmlFor="kpi-desc" className="text-[11px] text-muted-foreground">Опис</Label>
+                <Input
+                  id="kpi-desc"
+                  className="min-h-9 text-[13px]"
+                  placeholder="Опис (необовʼязково)"
+                  value={newDesc}
+                  onChange={(e) => setNewDesc(e.target.value)}
+                />
+              </div>
+              <Button type="button" onClick={handleAdd} className="shrink-0 gap-1 whitespace-nowrap text-[13px] font-semibold">
+                <Plus className="size-4" />
+                Створити
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {error && (
-          <div className="bg-red-50 text-red-700 px-3.5 py-2.5 rounded-lg text-xs mb-4 border-l-[3px] border-red-500">
+          <div
+            role="alert"
+            className="mb-4 rounded-md border-l-4 border-destructive bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive"
+          >
             {error}
           </div>
         )}
 
         {loading ? (
-          <div className="text-center py-10 text-gray-400 text-[13px]">Завантаження…</div>
+          <div className="flex items-center justify-center gap-2 py-10 text-[13px] text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            Завантаження…
+          </div>
         ) : kpis.length === 0 ? (
-          <div className="text-center py-10 text-gray-400 text-[13px]">KPI показників ще немає</div>
+          <div className="py-10 text-center text-[13px] text-muted-foreground">KPI показників ще немає</div>
         ) : (
           <div className="space-y-3">
             {kpis.map((kpi) => {
@@ -234,150 +263,164 @@ export function KpiManagePage() {
               const isEditing = editingId === kpi.id;
 
               return (
-                <div key={kpi.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
-                  {/* KPI header row */}
+                <Card key={kpi.id} className="overflow-hidden py-0">
                   <div
-                    className="flex items-center px-5 py-3.5 gap-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                    className="flex cursor-pointer items-center gap-3 px-5 py-3.5 transition-colors hover:bg-accent/50"
                     onClick={() => setExpandedKpi(isOpen ? null : kpi.id)}
                   >
-                    <span className={clsx("text-xs font-bold transition-transform", isOpen && "rotate-90")}>▶</span>
+                    <ChevronRight
+                      className={cn("size-4 shrink-0 text-muted-foreground transition-transform", isOpen && "rotate-90")}
+                    />
 
-                    <div className="flex-1 min-w-0">
+                    <div className="min-w-0 flex-1">
                       {isEditing ? (
-                        <div className="flex gap-2 items-center flex-wrap" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            className="px-2.5 py-1 text-[13px] border border-primary-400 rounded-md outline-none focus:ring-2 focus:ring-primary-100 w-48"
+                        <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          <Input
+                            className="w-48"
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
                             autoFocus
                           />
-                          <input
-                            className="px-2 py-1 text-[13px] border border-gray-300 rounded-md outline-none w-16"
-                            value={editUnit}
-                            onChange={(e) => setEditUnit(e.target.value)}
-                          />
-                          <input
-                            className="px-2 py-1 text-[13px] border border-gray-300 rounded-md outline-none w-20"
+                          <Input className="w-16" value={editUnit} onChange={(e) => setEditUnit(e.target.value)} />
+                          <Input
+                            className="w-20"
                             type="number"
                             value={editTarget}
                             onChange={(e) => setEditTarget(e.target.value)}
                           />
-                          <input
-                            className="px-2 py-1 text-[13px] border border-gray-300 rounded-md outline-none flex-1 min-w-[120px]"
+                          <Input
+                            className="min-w-[120px] flex-1"
                             placeholder="Опис"
                             value={editDesc}
                             onChange={(e) => setEditDesc(e.target.value)}
                           />
-                          <button
-                            onClick={saveEdit}
-                            className="px-3 py-1 text-[11px] font-semibold text-white bg-primary-600 rounded-md hover:bg-primary-500 transition-colors"
-                          >
+                          <Button type="button" size="sm" onClick={saveEdit}>
                             Зберегти
-                          </button>
-                          <button
-                            onClick={cancelEdit}
-                            className="px-3 py-1 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-                          >
+                          </Button>
+                          <Button type="button" size="sm" variant="secondary" onClick={cancelEdit}>
                             Скасувати
-                          </button>
+                          </Button>
                         </div>
                       ) : (
                         <div>
-                          <div className="text-sm font-semibold text-gray-900">
+                          <div className="text-sm font-semibold text-foreground">
                             {kpi.name}
-                            <span className="ml-2 text-[11px] text-gray-400 font-normal">
+                            <span className="ml-2 text-[11px] font-normal text-muted-foreground">
                               (ціль: {kpi.target_value} {kpi.unit})
                             </span>
-                            <span className="ml-2 text-[11px] text-teal-600 font-normal">
+                            <span className="ml-2 text-[11px] font-normal text-primary">
                               — {kpi.goals.length} {kpi.goals.length === 1 ? "ціль" : "цілей"}
                             </span>
                           </div>
                           {kpi.description && (
-                            <div className="text-[10px] text-gray-400 mt-0.5 truncate">{kpi.description}</div>
+                            <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{kpi.description}</div>
                           )}
                         </div>
                       )}
                     </div>
 
                     {!isEditing && (
-                      <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => startEdit(kpi)}
-                          className="px-3 py-1 text-[11px] font-semibold text-primary-700 bg-primary-50 border border-primary-500 rounded-md cursor-pointer hover:bg-primary-100 transition-colors"
-                        >
+                      <div className="flex shrink-0 gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <Button type="button" size="sm" variant="outline" onClick={() => startEdit(kpi)}>
                           Редагувати
-                        </button>
-                        <button
-                          onClick={() => handleDelete(kpi)}
-                          className={clsx(
-                            "px-3 py-1 text-[11px] font-semibold rounded-md border cursor-pointer transition-colors",
-                            kpi.goals.length > 0
-                              ? "text-gray-400 bg-gray-50 border-gray-300 cursor-not-allowed"
-                              : "text-red-700 bg-red-50 border-red-500 hover:bg-red-100",
-                          )}
-                          disabled={kpi.goals.length > 0}
-                          title={kpi.goals.length > 0 ? "Спочатку відʼєднайте KPI від усіх цілей" : "Видалити KPI"}
-                        >
-                          Видалити
-                        </button>
+                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span tabIndex={kpi.goals.length > 0 ? 0 : undefined}>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="destructive"
+                                disabled={kpi.goals.length > 0}
+                                onClick={() => handleDelete(kpi)}
+                              >
+                                Видалити
+                              </Button>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {kpi.goals.length > 0 ? "Спочатку відʼєднайте KPI від усіх цілей" : "Видалити KPI"}
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
                     )}
                   </div>
 
-                  {/* Goals usage table */}
                   {isOpen && (
-                    <div className="px-5 pb-4 border-t border-gray-200">
-                      {kpi.goals.length === 0 ? (
-                        <div className="text-xs text-gray-400 py-3">Цей KPI ще не привʼязаний до жодної цілі</div>
-                      ) : (
-                        <table className="w-full border-collapse text-xs mt-3">
-                          <thead>
-                            <tr className="bg-gray-50">
-                              <th className="px-3 py-2 text-left text-[11px] font-semibold text-gray-600">Ціль</th>
-                              <th className="px-3 py-2 text-left text-[11px] font-semibold text-gray-600">Проект</th>
-                              <th className="px-3 py-2 text-right text-[11px] font-semibold text-gray-600">Поточне</th>
-                              <th className="px-3 py-2 text-right text-[11px] font-semibold text-gray-600">Ціль</th>
-                              <th className="px-3 py-2 text-right text-[11px] font-semibold text-gray-600">Прогрес</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {kpi.goals.map((g) => {
-                              const pct = g.target_value ? Math.min(100, Math.round((g.current_value / g.target_value) * 100)) : 0;
-                              return (
-                                <tr key={g.goal_id} className="border-b border-gray-100">
-                                  <td className="px-3 py-2 font-medium text-gray-800">{g.goal_title}</td>
-                                  <td className="px-3 py-2 text-gray-500">{g.project_name}</td>
-                                  <td className={clsx("px-3 py-2 text-right font-bold", pct >= 100 ? "text-green-700" : "text-gray-900")}>
-                                    {g.current_value}
-                                  </td>
-                                  <td className="px-3 py-2 text-right text-gray-600">{g.target_value} {kpi.unit}</td>
-                                  <td className="px-3 py-2 text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                      <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                        <div
-                                          className={clsx("h-full rounded-full", pct >= 100 ? "bg-green-500" : "bg-primary-500")}
-                                          style={{ width: `${pct}%` }}
-                                        />
-                                      </div>
-                                      <span className={clsx("text-[11px] font-semibold", pct >= 100 ? "text-green-700" : "text-gray-600")}>
-                                        {pct}%
-                                      </span>
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      )}
-                    </div>
+                    <>
+                      <Separator />
+                      <CardContent className="px-5 pb-4 pt-0">
+                        {kpi.goals.length === 0 ? (
+                          <div className="py-3 text-xs text-muted-foreground">Цей KPI ще не привʼязаний до жодної цілі</div>
+                        ) : (
+                          <div className="mt-3">
+                            <Table className="text-xs">
+                              <TableHeader>
+                                <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                  <TableHead className="h-8 text-[11px] font-semibold">Ціль</TableHead>
+                                  <TableHead className="h-8 text-[11px] font-semibold">Проект</TableHead>
+                                  <TableHead className="h-8 text-[11px] font-semibold text-right">Поточне</TableHead>
+                                  <TableHead className="h-8 text-[11px] font-semibold text-right">Ціль</TableHead>
+                                  <TableHead className="h-8 text-[11px] font-semibold text-right">Прогрес</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {kpi.goals.map((g) => {
+                                  const pct = g.target_value
+                                    ? Math.min(100, Math.round((g.current_value / g.target_value) * 100))
+                                    : 0;
+                                  return (
+                                    <TableRow key={g.goal_id}>
+                                      <TableCell className="font-medium text-foreground">{g.goal_title}</TableCell>
+                                      <TableCell className="text-muted-foreground">{g.project_name}</TableCell>
+                                      <TableCell
+                                        className={cn(
+                                          "text-right font-bold",
+                                          pct >= 100 ? "text-success" : "text-foreground",
+                                        )}
+                                      >
+                                        {g.current_value}
+                                      </TableCell>
+                                      <TableCell className="text-right text-muted-foreground">
+                                        {g.target_value} {kpi.unit}
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        <div className="flex items-center justify-end gap-2">
+                                          <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+                                            <div
+                                              className={cn(
+                                                "h-full rounded-full",
+                                                pct >= 100 ? "bg-success" : "bg-primary",
+                                              )}
+                                              style={{ width: `${pct}%` }}
+                                            />
+                                          </div>
+                                          <span
+                                            className={cn(
+                                              "text-[11px] font-semibold",
+                                              pct >= 100 ? "text-success" : "text-muted-foreground",
+                                            )}
+                                          >
+                                            {pct}%
+                                          </span>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
+                      </CardContent>
+                    </>
                   )}
-                </div>
+                </Card>
               );
             })}
           </div>
         )}
       </div>
-    </div>
+    </SidebarPageLayout>
   );
 }
