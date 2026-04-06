@@ -2,6 +2,13 @@ import { cn } from "@/lib/utils";
 import { getAccentDef } from "../../constants";
 import { DateRangePicker } from "../ui";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "../ui/empty";
 import { GANTT_PX } from "../../constants";
 import { Calendar, Link as LinkIcon } from "lucide-react";
 import type { GanttMonth, GanttRange, Project, Team } from "../../types";
@@ -73,7 +80,17 @@ export function Gantt({
         </CardHeader>
         <CardContent>
           {proj.goals.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">Немає даних</div>
+            <Empty className="border-0 md:p-8">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Calendar />
+                </EmptyMedia>
+                <EmptyTitle>Немає цілей для діаграми</EmptyTitle>
+                <EmptyDescription>
+                  Після додавання цілей тут зʼявиться шкала часу з дорожніми картами та задачами.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : (
             <div style={{ minWidth: GANTT_PX + 340 }}>
               <div className="flex border-b-2 border-border bg-card sticky top-0 z-[2]">

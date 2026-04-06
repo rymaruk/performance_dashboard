@@ -1,10 +1,18 @@
 import { useState, useMemo } from "react";
 import { Button } from "../ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "../ui/empty";
 import { FilterSelect } from "../ui/FilterSelect";
 import { Accordion } from "../ui/accordion";
 import { GoalItem } from "./GoalItem";
 import { PRIO, STAT } from "../../constants";
-import { Plus, X, Target } from "lucide-react";
+import { FilterX, Plus, X, Target } from "lucide-react";
 import type { Goal, KPI, KpiDefinition, Task, Project, Team, UserProfile } from "../../types";
 
 interface GoalsProps {
@@ -112,6 +120,8 @@ export function Goals({
   }, [proj.goals, teamFilterId, filterPrio, filterStatus, userFilterId]);
 
   const hasFilters = filterTeam || filterPrio || filterStatus || filterUser;
+  const noGoals = proj.goals.length === 0;
+  const noMatches = filtered.length === 0;
 
   return (
     <div>
@@ -124,80 +134,127 @@ export function Goals({
         </Button>
       </div>
 
-      <div className="px-4 pt-2.5 flex gap-2 items-center flex-wrap">
-        <span className="text-[11px] font-semibold text-muted-foreground">Фільтри:</span>
-        <FilterSelect
-          label="Команда"
-          value={filterTeam}
-          options={teamOptions}
-          onChange={setFilterTeam}
-          renderOption={(opt) => {
-            const sep = opt.indexOf("::");
-            return sep >= 0 ? opt.slice(0, sep) : opt;
-          }}
-        />
-        <FilterSelect label="Пріоритет" value={filterPrio} options={[...PRIO]} onChange={setFilterPrio} />
-        <FilterSelect label="Статус" value={filterStatus} options={[...STAT]} onChange={setFilterStatus} />
-        <FilterSelect
-          label="Користувач"
-          value={filterUser}
-          options={userOptions}
-          onChange={setFilterUser}
-          renderOption={(opt) => {
-            const sep = opt.indexOf("::");
-            return sep >= 0 ? opt.slice(0, sep) : opt;
-          }}
-        />
-        {hasFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => { setFilterTeam(null); setFilterPrio(null); setFilterStatus(null); setFilterUser(null); }}
-            className="text-destructive hover:text-destructive/80 h-7"
-          >
-            <X className="size-3" /> Скинути всі
-          </Button>
-        )}
-      </div>
-
-      {filtered.length === 0 && hasFilters && (
-        <div className="py-8 px-4 text-center text-[13px] text-muted-foreground">
-          Немає цілей за обраними фільтрами
+      {!noGoals && (
+        <div className="px-4 pt-2.5 flex gap-2 items-center flex-wrap">
+          <span className="text-[11px] font-semibold text-muted-foreground">Фільтри:</span>
+          <FilterSelect
+            label="Команда"
+            value={filterTeam}
+            options={teamOptions}
+            onChange={setFilterTeam}
+            renderOption={(opt) => {
+              const sep = opt.indexOf("::");
+              return sep >= 0 ? opt.slice(0, sep) : opt;
+            }}
+          />
+          <FilterSelect label="Пріоритет" value={filterPrio} options={[...PRIO]} onChange={setFilterPrio} />
+          <FilterSelect label="Статус" value={filterStatus} options={[...STAT]} onChange={setFilterStatus} />
+          <FilterSelect
+            label="Користувач"
+            value={filterUser}
+            options={userOptions}
+            onChange={setFilterUser}
+            renderOption={(opt) => {
+              const sep = opt.indexOf("::");
+              return sep >= 0 ? opt.slice(0, sep) : opt;
+            }}
+          />
+          {hasFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setFilterTeam(null); setFilterPrio(null); setFilterStatus(null); setFilterUser(null); }}
+              className="text-destructive hover:text-destructive/80 h-7"
+            >
+              <X className="size-3" /> Скинути всі
+            </Button>
+          )}
         </div>
       )}
 
-      <Accordion
-        type="multiple"
-        value={openGoalIds}
-        onValueChange={onOpenGoalIdsChange}
-        className="px-4 pt-2"
-      >
-        {filtered.map((g) => (
-          <GoalItem
-            key={g.id}
-            goal={g}
-            kpiDefinitions={kpiDefinitions}
-            teams={teams}
-            isAdmin={isAdmin}
-            teamUsers={g.team_id ? teamUsers[g.team_id] ?? [] : []}
-            expandedTasks={expandedTasks}
-            filteredTaskIds={filteredTaskIdsByGoal[g.id] ?? null}
-            onRemove={() => onRemoveGoal(g.id)}
-            onUpdateField={(field, value) => onUpdateGoalField(g.id, field, value)}
-            onChangeDates={(field, val) => onChangeGoalDates(g.id, field, val)}
-            onAddKPI={(kpiDefId) => onAddKPI(g.id, kpiDefId)}
-            onRemoveKPI={(kid) => onRemoveKPI(g.id, kid)}
-            onUpdateKPI={(kid, fn) => onUpdateKPI(g.id, kid, fn)}
-            onAddTask={() => onAddTask(g.id)}
-            onRemoveTask={(tid) => onRemoveTask(g.id, tid)}
-            onUpdateTask={(tid, fn) => onUpdateTask(g.id, tid, fn)}
-            onToggleTask={onToggleTask}
-            onAddLink={(tid) => onAddLink(g.id, tid)}
-            onRemoveLink={(tid, lid) => onRemoveLink(g.id, tid, lid)}
-            onUpdateLink={(tid, lid, lk) => onUpdateLink(g.id, tid, lid, lk)}
-          />
-        ))}
-      </Accordion>
+      {noGoals && (
+        <div className="px-4 pt-4 pb-2">
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Target />
+              </EmptyMedia>
+              <EmptyTitle>Ще немає цілей</EmptyTitle>
+              <EmptyDescription>
+                Створіть першу ціль, щоб додати KPI та задачі й відстежувати прогрес команди.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button onClick={onAddGoal} size="sm">
+                <Plus className="size-3.5" /> Додати ціль
+              </Button>
+            </EmptyContent>
+          </Empty>
+        </div>
+      )}
+
+      {!noGoals && noMatches && hasFilters && (
+        <div className="px-4 pt-4 pb-2">
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <FilterX />
+              </EmptyMedia>
+              <EmptyTitle>Немає цілей за фільтрами</EmptyTitle>
+              <EmptyDescription>Спробуйте змінити або скинути фільтри, щоб побачити інші цілі.</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setFilterTeam(null);
+                  setFilterPrio(null);
+                  setFilterStatus(null);
+                  setFilterUser(null);
+                }}
+              >
+                <X className="size-3" /> Скинути фільтри
+              </Button>
+            </EmptyContent>
+          </Empty>
+        </div>
+      )}
+
+      {!noMatches && (
+        <Accordion
+          type="multiple"
+          value={openGoalIds}
+          onValueChange={onOpenGoalIdsChange}
+          className="px-4 pt-2"
+        >
+          {filtered.map((g) => (
+            <GoalItem
+              key={g.id}
+              goal={g}
+              kpiDefinitions={kpiDefinitions}
+              teams={teams}
+              isAdmin={isAdmin}
+              teamUsers={g.team_id ? teamUsers[g.team_id] ?? [] : []}
+              expandedTasks={expandedTasks}
+              filteredTaskIds={filteredTaskIdsByGoal[g.id] ?? null}
+              onRemove={() => onRemoveGoal(g.id)}
+              onUpdateField={(field, value) => onUpdateGoalField(g.id, field, value)}
+              onChangeDates={(field, val) => onChangeGoalDates(g.id, field, val)}
+              onAddKPI={(kpiDefId) => onAddKPI(g.id, kpiDefId)}
+              onRemoveKPI={(kid) => onRemoveKPI(g.id, kid)}
+              onUpdateKPI={(kid, fn) => onUpdateKPI(g.id, kid, fn)}
+              onAddTask={() => onAddTask(g.id)}
+              onRemoveTask={(tid) => onRemoveTask(g.id, tid)}
+              onUpdateTask={(tid, fn) => onUpdateTask(g.id, tid, fn)}
+              onToggleTask={onToggleTask}
+              onAddLink={(tid) => onAddLink(g.id, tid)}
+              onRemoveLink={(tid, lid) => onRemoveLink(g.id, tid, lid)}
+              onUpdateLink={(tid, lid, lk) => onUpdateLink(g.id, tid, lid, lk)}
+            />
+          ))}
+        </Accordion>
+      )}
     </div>
   );
 }
