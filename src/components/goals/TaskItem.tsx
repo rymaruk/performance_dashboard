@@ -1,11 +1,42 @@
 import { cn } from "@/lib/utils";
-import { Editable, EditableArea, DateRangePicker, LinksEditor } from "../ui";
+import { DateRangePicker, LinksEditor } from "../ui";
+import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import {
+  FieldGroup,
+  Field,
+  FieldContent,
+  FieldSeparator,
+} from "../ui/field";
+import {
+  Item,
+  ItemMedia,
+  ItemContent,
+  ItemTitle,
+} from "../ui/item";
 import { getAccentDef } from "../../constants";
 import { useConfirmAction } from "../../hooks/ConfirmContext";
 import { TSTAT, TASK_ROLES } from "../../constants";
-import { ChevronRight, X, FileText } from "lucide-react";
+import {
+  ChevronRight,
+  X,
+  FileText,
+  Link as LinkIcon,
+  User,
+  CircleDot,
+  ChevronDown,
+} from "lucide-react";
 import type { Task, Goal } from "../../types";
 
 interface TaskItemProps {
@@ -19,6 +50,12 @@ interface TaskItemProps {
   onRemoveLink: (lid: string) => void;
   onUpdateLink: (lid: string, lk: Task["links"][0]) => void;
 }
+
+const TSTAT_STYLES: Record<string, string> = {
+  "To Do": "bg-muted text-muted-foreground",
+  "In Progress": "bg-sky-500/10 text-sky-600",
+  Done: "bg-success/10 text-success",
+};
 
 export function TaskItem({
   task: t,
@@ -35,42 +72,147 @@ export function TaskItem({
   const ac = getAccentDef(t.color ?? g.color);
 
   return (
-    <div className={cn("mb-1.5 border border-border rounded-md overflow-hidden", t.status === "Done" ? "bg-success/5" : "bg-card")}>
-      <div className="flex items-center gap-1.5 px-2.5 py-2 cursor-pointer flex-wrap" onClick={onToggle}>
-        <ChevronRight className={cn("size-3.5 transition-transform text-muted-foreground", isOpen && "rotate-90")} />
+    <div
+      className={cn(
+        "mb-1.5 rounded-md border border-border overflow-hidden",
+        t.status === "Done" ? "bg-success/5" : "bg-card",
+      )}
+    >
+      <div
+        className="flex items-center gap-2 px-3 py-2.5 cursor-pointer flex-wrap"
+        onClick={onToggle}
+      >
+        <ChevronRight
+          className={cn(
+            "size-3.5 shrink-0 transition-transform text-muted-foreground",
+            isOpen && "rotate-90",
+          )}
+        />
 
-        <div className="flex-1 min-w-[100px]">
-          <Editable
+        <Field className="flex-1 min-w-[100px]" onClick={(e) => e.stopPropagation()}>
+          <Input
             value={t.title}
-            onChange={(v) => onUpdate((tt) => ({ ...tt, title: String(v) }))}
-            className={cn("font-semibold text-xs", t.status === "Done" && "line-through")}
-            placeholder="Назва"
+            onChange={(e) =>
+              onUpdate((tt) => ({ ...tt, title: e.target.value }))
+            }
+            placeholder="Назва задачі"
+            className={cn(
+              "h-auto border-none bg-transparent shadow-none px-0 py-0 text-xs font-semibold",
+              "focus-visible:ring-0 focus-visible:border-none",
+              t.status === "Done" && "line-through text-muted-foreground",
+            )}
+          />
+        </Field>
+
+        <div onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                  "cursor-pointer outline-none transition-colors hover:opacity-80",
+                  "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                  ac.bgLight,
+                  ac.text,
+                )}
+              >
+                <User className="size-2.5" />
+                {t.assignee}
+                <ChevronDown className="size-2.5 opacity-50" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[130px]">
+              <DropdownMenuLabel>Виконавець</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                {TASK_ROLES.map((role) => (
+                  <DropdownMenuItem
+                    key={role}
+                    className={cn(
+                      t.assignee === role && "bg-accent font-semibold",
+                    )}
+                    onSelect={() =>
+                      onUpdate((tt) => ({
+                        ...tt,
+                        assignee: role as Task["assignee"],
+                      }))
+                    }
+                  >
+                    {role}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <div onClick={(e) => e.stopPropagation()}>
+          <DateRangePicker
+            startDate={t.startDate}
+            endDate={t.endDate}
+            onChangeStart={(v) =>
+              onUpdate((tt) => ({ ...tt, startDate: v }))
+            }
+            onChangeEnd={(v) =>
+              onUpdate((tt) => ({ ...tt, endDate: v }))
+            }
+            minDate={g.startDate}
+            maxDate={g.endDate}
+            size="sm"
           />
         </div>
 
-        <Editable
-          value={t.assignee}
-          onChange={(v) => onUpdate((tt) => ({ ...tt, assignee: v as Task["assignee"] }))}
-          options={[...TASK_ROLES]}
-          className={cn("text-[10px] font-semibold px-2 py-px rounded-full", ac.bgLight, ac.text)}
-        />
-
-        <DateRangePicker
-          startDate={t.startDate}
-          endDate={t.endDate}
-          onChangeStart={(v) => onUpdate((tt) => ({ ...tt, startDate: v }))}
-          onChangeEnd={(v) => onUpdate((tt) => ({ ...tt, endDate: v }))}
-          minDate={g.startDate}
-          maxDate={g.endDate}
-          size="sm"
-        />
-
-        <Editable
-          value={t.status}
-          onChange={(v) => onUpdate((tt) => ({ ...tt, status: v as Task["status"] }))}
-          options={[...TSTAT]}
-          className={cn("text-[10px] px-2 py-px rounded-full font-semibold")}
-        />
+        <div onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                  "cursor-pointer outline-none transition-colors hover:opacity-80",
+                  "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                  TSTAT_STYLES[t.status] ?? "bg-muted text-muted-foreground",
+                )}
+              >
+                <CircleDot className="size-2.5" />
+                {t.status}
+                <ChevronDown className="size-2.5 opacity-50" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[130px]">
+              <DropdownMenuLabel>Статус</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                {TSTAT.map((s) => (
+                  <DropdownMenuItem
+                    key={s}
+                    className={cn(
+                      t.status === s && "bg-accent font-semibold",
+                    )}
+                    onSelect={() =>
+                      onUpdate((tt) => ({
+                        ...tt,
+                        status: s as Task["status"],
+                      }))
+                    }
+                  >
+                    <span
+                      className={cn(
+                        "size-2 rounded-full shrink-0",
+                        TSTAT_STYLES[s]?.includes("text-")
+                          ? TSTAT_STYLES[s]
+                              .split(" ")
+                              .find((c) => c.startsWith("text-"))
+                              ?.replace("text-", "bg-")
+                          : "bg-muted-foreground",
+                      )}
+                    />
+                    {s}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
         <Tooltip>
           <TooltipTrigger asChild>
@@ -78,7 +220,13 @@ export function TaskItem({
               variant="ghost"
               size="icon"
               className="size-6 text-destructive hover:text-destructive/80 hover:bg-destructive/10"
-              onClick={(e) => { e.stopPropagation(); confirm(`Видалити задачу «${t.title || "без назви"}»?`, onRemove); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                confirm(
+                  `Видалити задачу «${t.title || "без назви"}»?`,
+                  onRemove,
+                );
+              }}
             >
               <X className="size-3.5" />
             </Button>
@@ -88,14 +236,51 @@ export function TaskItem({
       </div>
 
       {isOpen && (
-        <div className="px-2.5 pb-2.5 pl-7 border-t border-border">
-          <div className="mt-2">
-            <div className="text-[11px] font-semibold text-muted-foreground mb-0.5 flex items-center gap-1">
-              <FileText className="size-3" /> Опис
-            </div>
-            <EditableArea value={t.desc} onChange={(v) => onUpdate((tt) => ({ ...tt, desc: v }))} />
-          </div>
-          <LinksEditor links={t.links} onAdd={onAddLink} onRemove={onRemoveLink} onUpdate={onUpdateLink} />
+        <div className="border-t border-border pl-8">
+          <FieldGroup className="space-y-0">
+            <Item size="sm" variant="default" className="items-start">
+              <ItemMedia variant="icon" className="mt-0.5 size-7 [&_svg]:size-3.5">
+                <FileText />
+              </ItemMedia>
+              <ItemContent className="gap-1.5">
+                <ItemTitle className="text-[11px] text-muted-foreground font-semibold">
+                  Опис
+                </ItemTitle>
+                <Field>
+                  <FieldContent>
+                    <Textarea
+                      value={t.desc}
+                      onChange={(e) =>
+                        onUpdate((tt) => ({ ...tt, desc: e.target.value }))
+                      }
+                      placeholder="Додайте опис задачі…"
+                      className="min-h-[60px] border-input bg-transparent px-2.5 py-1.5 text-xs leading-relaxed resize-y"
+                    />
+                  </FieldContent>
+                </Field>
+              </ItemContent>
+            </Item>
+
+            <FieldSeparator className="mx-3" />
+
+            <Item size="sm" variant="default" className="items-start pb-3">
+              <ItemMedia variant="icon" className="mt-0.5 size-7 [&_svg]:size-3.5">
+                <LinkIcon />
+              </ItemMedia>
+              <ItemContent className="gap-1">
+                <Field>
+                  <FieldContent>
+                    <LinksEditor
+                      links={t.links}
+                      onAdd={onAddLink}
+                      onRemove={onRemoveLink}
+                      onUpdate={onUpdateLink}
+                    />
+                  </FieldContent>
+                </Field>
+              </ItemContent>
+            </Item>
+          </FieldGroup>
         </div>
       )}
     </div>

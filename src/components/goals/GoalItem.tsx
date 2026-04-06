@@ -11,6 +11,15 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from "../ui/accordion";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { ColorPicker } from "../ui/color-picker";
 import { KPITable } from "./KPITable";
 import { TaskItem } from "./TaskItem";
@@ -18,7 +27,23 @@ import { getAccentDef } from "../../constants";
 import { medDate } from "../../utils/date";
 import { useConfirmAction } from "../../hooks/ConfirmContext";
 import { ROLES, PRIO, STAT } from "../../constants";
-import { Plus, X } from "lucide-react";
+import {
+  Item,
+  ItemMedia,
+  ItemContent,
+  ItemTitle,
+  ItemDescription,
+  ItemActions,
+} from "../ui/item";
+import {
+  Plus,
+  X,
+  Users,
+  Flag,
+  CircleDot,
+  ChevronDown,
+  ClipboardList,
+} from "lucide-react";
 import type { Goal, KPI, KpiDefinition, Task } from "../../types";
 import type { AccentColor } from "../../constants";
 
@@ -40,6 +65,21 @@ interface GoalItemProps {
   onRemoveLink: (tid: string, lid: string) => void;
   onUpdateLink: (tid: string, lid: string, lk: Task["links"][0]) => void;
 }
+
+const STATUS_STYLES: Record<string, string> = {
+  "Планується": "bg-muted text-muted-foreground",
+  "В процесі": "bg-sky-500/10 text-sky-600",
+  "На ревʼю": "bg-amber-500/10 text-amber-600",
+  "Завершено": "bg-success/10 text-success",
+  "Заблоковано": "bg-destructive/10 text-destructive",
+};
+
+const PRIO_STYLES: Record<string, string> = {
+  "🔴 Критичний": "text-rose-600",
+  "🟠 Високий": "text-orange-600",
+  "🟡 Середній": "text-amber-600",
+  "🟢 Низький": "text-emerald-600",
+};
 
 export function GoalItem({
   goal: g,
@@ -76,11 +116,14 @@ export function GoalItem({
           ac.bgLight,
         )}
       >
-        <ColorPicker
-          value={g.color}
-          onChange={(c: AccentColor) => onUpdateField("color", c)}
-          size="sm"
-        />
+        <div onClick={(e) => e.stopPropagation()}>
+          <ColorPicker
+            value={g.color}
+            onChange={(c: AccentColor) => onUpdateField("color", c)}
+            size="sm"
+          />
+        </div>
+
         <div className="flex-1 min-w-[160px]" onClick={(e) => e.stopPropagation()}>
           <Editable
             value={g.title}
@@ -101,31 +144,125 @@ export function GoalItem({
         </div>
 
         <div onClick={(e) => e.stopPropagation()}>
-          <Editable
-            value={g.owner}
-            onChange={(v) => onUpdateField("owner", v)}
-            options={[...ROLES]}
-            className={cn("text-[11px] px-2.5 py-0.5 rounded-full font-semibold", ac.bgLight, ac.text)}
-          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
+                  "cursor-pointer outline-none transition-colors hover:opacity-80",
+                  "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                  ac.bgLight,
+                  ac.text,
+                )}
+              >
+                <Users className="size-3" />
+                {g.owner}
+                <ChevronDown className="size-3 opacity-50" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[140px]">
+              <DropdownMenuLabel>Команда</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                {ROLES.map((role) => (
+                  <DropdownMenuItem
+                    key={role}
+                    className={cn(
+                      g.owner === role && "bg-accent font-semibold",
+                    )}
+                    onSelect={() => onUpdateField("owner", role)}
+                  >
+                    {role}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
+
         <div onClick={(e) => e.stopPropagation()}>
-          <Editable
-            value={g.priority}
-            onChange={(v) => onUpdateField("priority", v)}
-            options={[...PRIO]}
-            className="text-[11px]"
-          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
+                  "cursor-pointer outline-none transition-colors hover:opacity-80",
+                  "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                  "bg-muted",
+                  PRIO_STYLES[g.priority] ?? "text-muted-foreground",
+                )}
+              >
+                <Flag className="size-3" />
+                {g.priority}
+                <ChevronDown className="size-3 opacity-50" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[160px]">
+              <DropdownMenuLabel>Пріоритет</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                {PRIO.map((p) => (
+                  <DropdownMenuItem
+                    key={p}
+                    className={cn(
+                      PRIO_STYLES[p],
+                      g.priority === p && "bg-accent font-semibold",
+                    )}
+                    onSelect={() => onUpdateField("priority", p)}
+                  >
+                    {p}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
+
         <div onClick={(e) => e.stopPropagation()}>
-          <Editable
-            value={g.status}
-            onChange={(v) => onUpdateField("status", v)}
-            options={[...STAT]}
-            className={cn(
-              "text-[11px] px-2.5 py-0.5 rounded-full font-semibold",
-              g.status === "Завершено" ? "bg-success/10 text-success" : "bg-muted text-muted-foreground",
-            )}
-          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
+                  "cursor-pointer outline-none transition-colors hover:opacity-80",
+                  "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                  STATUS_STYLES[g.status] ?? "bg-muted text-muted-foreground",
+                )}
+              >
+                <CircleDot className="size-3" />
+                {g.status}
+                <ChevronDown className="size-3 opacity-50" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[160px]">
+              <DropdownMenuLabel>Статус</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                {STAT.map((s) => (
+                  <DropdownMenuItem
+                    key={s}
+                    className={cn(
+                      g.status === s && "bg-accent font-semibold",
+                    )}
+                    onSelect={() => onUpdateField("status", s)}
+                  >
+                    <span
+                      className={cn(
+                        "size-2 rounded-full shrink-0",
+                        STATUS_STYLES[s]?.includes("text-")
+                          ? STATUS_STYLES[s]
+                              .split(" ")
+                              .find((c) => c.startsWith("text-"))
+                              ?.replace("text-", "bg-")
+                          : "bg-muted-foreground",
+                      )}
+                    />
+                    {s}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <Tooltip>
@@ -134,7 +271,13 @@ export function GoalItem({
               variant="ghost"
               size="icon"
               className="size-7 text-destructive hover:text-destructive/80 hover:bg-destructive/10"
-              onClick={(e) => { e.stopPropagation(); confirm(`Видалити ціль «${g.title || "без назви"}»?`, onRemove); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                confirm(
+                  `Видалити ціль «${g.title || "без назви"}»?`,
+                  onRemove,
+                );
+              }}
             >
               <X className="size-4" />
             </Button>
@@ -144,20 +287,33 @@ export function GoalItem({
       </AccordionTrigger>
 
       <AccordionContent className="px-4 pb-4">
-        <KPITable goalId={g.id} goalColor={g.color} kpis={g.kpis} kpiDefinitions={kpiDefinitions} onAdd={onAddKPI} onRemove={onRemoveKPI} onUpdate={onUpdateKPI} />
+        <KPITable
+          goalId={g.id}
+          goalColor={g.color}
+          kpis={g.kpis}
+          kpiDefinitions={kpiDefinitions}
+          onAdd={onAddKPI}
+          onRemove={onRemoveKPI}
+          onUpdate={onUpdateKPI}
+        />
 
         <div>
-          <div className="flex justify-between mb-2">
-            <span className="text-xs font-bold text-foreground flex items-center gap-1">
-              📋 Задачі
-              <span className="font-normal text-muted-foreground text-[11px]">
-                ({medDate(g.startDate)} – {medDate(g.endDate)})
-              </span>
-            </span>
-            <Button onClick={onAddTask} size="sm" variant="outline">
-              <Plus className="size-3" /> Задача
-            </Button>
-          </div>
+          <Item size="sm" className="mb-2">
+            <ItemMedia variant="icon">
+              <ClipboardList />
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle>Задачі</ItemTitle>
+              <ItemDescription>
+                {medDate(g.startDate)} – {medDate(g.endDate)}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Button onClick={onAddTask} size="sm" variant="outline">
+                <Plus className="size-3" /> Задача
+              </Button>
+            </ItemActions>
+          </Item>
 
           {g.tasks.map((t) => (
             <TaskItem
