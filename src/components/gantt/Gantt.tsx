@@ -4,10 +4,11 @@ import { DateRangePicker } from "../ui";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { GANTT_PX } from "../../constants";
 import { Calendar, Link as LinkIcon } from "lucide-react";
-import type { GanttMonth, GanttRange, Project } from "../../types";
+import type { GanttMonth, GanttRange, Project, Team } from "../../types";
 
 interface GanttProps {
   proj: Project;
+  teams: Team[];
   ganttRange: GanttRange;
   ganttMonths: GanttMonth[];
   ganttExpanded: Record<string, boolean>;
@@ -38,6 +39,7 @@ function MonthBg({ ganttMonths, pxPerDay }: { ganttMonths: GanttMonth[]; pxPerDa
 
 export function Gantt({
   proj,
+  teams,
   ganttRange,
   ganttMonths,
   ganttExpanded,
@@ -45,6 +47,8 @@ export function Gantt({
   onChangeGoalDates,
   onChangeTaskDates,
 }: GanttProps) {
+  const teamName = (teamId: string | null | undefined) =>
+    teams.find((t) => t.id === teamId)?.name ?? "Без команди";
   const pxPerDay = GANTT_PX / Math.max(ganttRange.totalDays, 1);
 
   const barPos = (sd: string, ed: string) => {
@@ -122,7 +126,7 @@ export function Gantt({
                         <span className="text-xs font-bold truncate">{g.title || "—"}</span>
                       </div>
                       <div className={cn("w-[80px] min-w-[80px] text-[10px] font-semibold px-1", gac.text)}>
-                        {g.owner}
+                        {teamName(g.team_id)}
                       </div>
                       <div className="flex-1 relative h-[26px]">
                         <MonthBg ganttMonths={ganttMonths} pxPerDay={pxPerDay} />
@@ -209,7 +213,7 @@ export function Gantt({
                   return (
                     <div key={g.id} className="flex items-center gap-1 text-[11px] text-foreground">
                       <span className={cn("w-3.5 h-2.5 rounded-sm inline-block", lac.bg)} />
-                      <span className="font-semibold truncate max-w-[120px]">{g.title || g.owner}</span>
+                      <span className="font-semibold truncate max-w-[120px]">{g.title || teamName(g.team_id)}</span>
                     </div>
                   );
                 })}

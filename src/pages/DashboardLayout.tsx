@@ -23,14 +23,14 @@ export function DashboardLayout() {
     stats,
     ganttRange,
     ganttMonths,
+    teams,
+    teamUsers,
     toggleTask,
     toggleGanttGoal,
     addProject,
     deleteProject,
     switchProject,
-    updateProjName,
-    updateProjDesc,
-    updateProjColor,
+    updateProjectSettings,
     addGoal,
     removeGoal,
     updateGoalField,
@@ -74,9 +74,7 @@ export function DashboardLayout() {
         projects={projects}
         activeProjectId={activeProjectId}
         onSwitch={switchProject}
-        onUpdateName={updateProjName}
-        onUpdateDesc={updateProjDesc}
-        onUpdateColor={updateProjColor}
+        onSaveProject={updateProjectSettings}
         onDelete={() => proj.id && deleteProject(proj.id)}
         onAddProject={addProject}
       />
@@ -85,13 +83,15 @@ export function DashboardLayout() {
         <>
           <Nav tab={tab} onTabChange={setTab}>
             <TabsContent value="dash">
-              <Dashboard proj={proj} stats={stats} />
+              <Dashboard proj={proj} stats={stats} teams={teams} />
             </TabsContent>
 
             <TabsContent value="goals">
               <Goals
                 proj={proj}
                 kpiDefinitions={kpiDefinitions}
+                teams={teams}
+                teamUsers={teamUsers}
                 openGoalIds={openGoalIds}
                 onOpenGoalIdsChange={setOpenGoalIds}
                 expandedTasks={expandedTasks}
@@ -113,12 +113,13 @@ export function DashboardLayout() {
             </TabsContent>
 
             <TabsContent value="kpi">
-              <KPIPanel proj={proj} onUpdateKPI={updateKPI} />
+              <KPIPanel proj={proj} teams={teams} onUpdateKPI={updateKPI} />
             </TabsContent>
 
             <TabsContent value="gantt">
               <Gantt
                 proj={proj}
+                teams={teams}
                 ganttRange={ganttRange}
                 ganttMonths={ganttMonths}
                 ganttExpanded={ganttExpanded}

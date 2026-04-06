@@ -16,11 +16,13 @@ interface FilterSelectProps {
   value: string | null;
   options: string[];
   onChange: (v: string | null) => void;
+  renderOption?: (opt: string) => string;
 }
 
 const SENTINEL_ALL = "__all__";
 
-export function FilterSelect({ label, value, options, onChange }: FilterSelectProps) {
+export function FilterSelect({ label, value, options, onChange, renderOption }: FilterSelectProps) {
+  const display = (opt: string) => renderOption ? renderOption(opt) : opt;
   return (
     <div className="flex items-center gap-1">
       <Select
@@ -44,7 +46,7 @@ export function FilterSelect({ label, value, options, onChange }: FilterSelectPr
             <SelectItem value={SENTINEL_ALL}>Усі</SelectItem>
             {options.map((opt) => (
               <SelectItem key={opt} value={opt}>
-                {opt}
+                {display(opt)}
               </SelectItem>
             ))}
           </SelectGroup>

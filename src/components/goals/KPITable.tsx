@@ -64,7 +64,7 @@ export function KPITable({
 
   return (
     <div className="mb-4">
-      <Item size="sm" className="mb-2">
+      <Item size="sm" className="mb-2 align-middle">
         <ItemMedia variant="icon">
           <BarChart3 />
         </ItemMedia>

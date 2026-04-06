@@ -35,9 +35,7 @@ interface ProjectBarProps {
   projects: Project[];
   activeProjectId: string;
   onSwitch: (id: string) => void;
-  onUpdateName: (v: string) => void;
-  onUpdateDesc: (v: string) => void;
-  onUpdateColor: (v: string) => void;
+  onSaveProject: (name: string, desc: string, color: string) => void;
   onDelete: () => void;
   onAddProject: () => void;
 }
@@ -46,9 +44,7 @@ export function ProjectBar({
   projects,
   activeProjectId,
   onSwitch,
-  onUpdateName,
-  onUpdateDesc,
-  onUpdateColor,
+  onSaveProject,
   onDelete,
   onAddProject,
 }: ProjectBarProps) {
@@ -69,9 +65,7 @@ export function ProjectBar({
   }
 
   function handleSave() {
-    onUpdateName(editName);
-    onUpdateDesc(editDesc);
-    onUpdateColor(editColor);
+    onSaveProject(editName, editDesc, String(editColor));
     setOpen(false);
   }
 

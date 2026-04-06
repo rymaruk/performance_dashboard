@@ -3,13 +3,15 @@ import { Button } from "../ui/button";
 import { FilterSelect } from "../ui/FilterSelect";
 import { Accordion } from "../ui/accordion";
 import { GoalItem } from "./GoalItem";
-import { ROLES, PRIO, STAT } from "../../constants";
+import { PRIO, STAT } from "../../constants";
 import { Plus, X, Target } from "lucide-react";
-import type { Goal, KPI, KpiDefinition, Task, Project } from "../../types";
+import type { Goal, KPI, KpiDefinition, Task, Project, Team, UserProfile } from "../../types";
 
 interface GoalsProps {
   proj: Project;
   kpiDefinitions: KpiDefinition[];
+  teams: Team[];
+  teamUsers: Record<string, UserProfile[]>;
   openGoalIds: string[];
   onOpenGoalIdsChange: (ids: string[]) => void;
   expandedTasks: Record<string, boolean>;
@@ -32,6 +34,8 @@ interface GoalsProps {
 export function Goals({
   proj,
   kpiDefinitions,
+  teams,
+  teamUsers,
   openGoalIds,
   onOpenGoalIdsChange,
   expandedTasks,
@@ -50,20 +54,62 @@ export function Goals({
   onRemoveLink,
   onUpdateLink,
 }: GoalsProps) {
-  const [filterOwner, setFilterOwner] = useState<string | null>(null);
+  const [filterTeam, setFilterTeam] = useState<string | null>(null);
   const [filterPrio, setFilterPrio] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
+  const [filterUser, setFilterUser] = useState<string | null>(null);
 
-  const filtered = useMemo(() => {
-    return proj.goals.filter((g) => {
-      if (filterOwner && g.owner !== filterOwner) return false;
+  const teamOptions = useMemo(
+    () => teams.map((t) => `${t.name}::${t.id}`),
+    [teams],
+  );
+
+  const teamFilterId = useMemo(() => {
+    if (!filterTeam) return null;
+    const sep = filterTeam.indexOf("::");
+    return sep >= 0 ? filterTeam.slice(sep + 2) : null;
+  }, [filterTeam]);
+
+  const allUsers = useMemo(() => {
+    const map = new Map<string, UserProfile>();
+    for (const users of Object.values(teamUsers)) {
+      for (const u of users) {
+        map.set(u.id, u);
+      }
+    }
+    return [...map.values()];
+  }, [teamUsers]);
+
+  const userOptions = useMemo(
+    () => allUsers.map((u) => `${u.first_name} ${u.last_name}::${u.id}`),
+    [allUsers],
+  );
+
+  const userFilterId = useMemo(() => {
+    if (!filterUser) return null;
+    const sep = filterUser.indexOf("::");
+    return sep >= 0 ? filterUser.slice(sep + 2) : null;
+  }, [filterUser]);
+
+  const { filtered, filteredTaskIdsByGoal } = useMemo(() => {
+    const filteredTaskIdsByGoal: Record<string, Set<string>> = {};
+    const filtered = proj.goals.filter((g) => {
+      if (teamFilterId && g.team_id !== teamFilterId) return false;
       if (filterPrio && g.priority !== filterPrio) return false;
       if (filterStatus && g.status !== filterStatus) return false;
+
+      if (userFilterId) {
+        const matchingTasks = g.tasks.filter((t) => t.user_id === userFilterId);
+        if (matchingTasks.length === 0) return false;
+        filteredTaskIdsByGoal[g.id] = new Set(matchingTasks.map((t) => t.id));
+      }
+
       return true;
     });
-  }, [proj.goals, filterOwner, filterPrio, filterStatus]);
+    return { filtered, filteredTaskIdsByGoal };
+  }, [proj.goals, teamFilterId, filterPrio, filterStatus, userFilterId]);
 
-  const hasFilters = filterOwner || filterPrio || filterStatus;
+  const hasFilters = filterTeam || filterPrio || filterStatus || filterUser;
 
   return (
     <div>
@@ -78,14 +124,33 @@ export function Goals({
 
       <div className="px-4 pt-2.5 flex gap-2 items-center flex-wrap">
         <span className="text-[11px] font-semibold text-muted-foreground">Фільтри:</span>
-        <FilterSelect label="Команда" value={filterOwner} options={[...ROLES]} onChange={setFilterOwner} />
+        <FilterSelect
+          label="Команда"
+          value={filterTeam}
+          options={teamOptions}
+          onChange={setFilterTeam}
+          renderOption={(opt) => {
+            const sep = opt.indexOf("::");
+            return sep >= 0 ? opt.slice(0, sep) : opt;
+          }}
+        />
         <FilterSelect label="Пріоритет" value={filterPrio} options={[...PRIO]} onChange={setFilterPrio} />
         <FilterSelect label="Статус" value={filterStatus} options={[...STAT]} onChange={setFilterStatus} />
+        <FilterSelect
+          label="Користувач"
+          value={filterUser}
+          options={userOptions}
+          onChange={setFilterUser}
+          renderOption={(opt) => {
+            const sep = opt.indexOf("::");
+            return sep >= 0 ? opt.slice(0, sep) : opt;
+          }}
+        />
         {hasFilters && (
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => { setFilterOwner(null); setFilterPrio(null); setFilterStatus(null); }}
+            onClick={() => { setFilterTeam(null); setFilterPrio(null); setFilterStatus(null); setFilterUser(null); }}
             className="text-destructive hover:text-destructive/80 h-7"
           >
             <X className="size-3" /> Скинути всі
@@ -110,7 +175,10 @@ export function Goals({
             key={g.id}
             goal={g}
             kpiDefinitions={kpiDefinitions}
+            teams={teams}
+            teamUsers={g.team_id ? teamUsers[g.team_id] ?? [] : []}
             expandedTasks={expandedTasks}
+            filteredTaskIds={filteredTaskIdsByGoal[g.id] ?? null}
             onRemove={() => onRemoveGoal(g.id)}
             onUpdateField={(field, value) => onUpdateGoalField(g.id, field, value)}
             onChangeDates={(field, val) => onChangeGoalDates(g.id, field, val)}

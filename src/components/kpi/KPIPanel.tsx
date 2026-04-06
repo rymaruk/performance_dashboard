@@ -6,14 +6,17 @@ import { Badge } from "../ui/badge";
 import { medDate } from "../../utils/date";
 import { getAccentDef } from "../../constants";
 import { BarChart3 } from "lucide-react";
-import type { KPI, Project } from "../../types";
+import type { KPI, Project, Team } from "../../types";
 
 interface KPIPanelProps {
   proj: Project;
+  teams: Team[];
   onUpdateKPI: (gid: string, kid: string, fn: (k: KPI) => KPI) => void;
 }
 
-export function KPIPanel({ proj, onUpdateKPI }: KPIPanelProps) {
+export function KPIPanel({ proj, teams, onUpdateKPI }: KPIPanelProps) {
+  const teamName = (teamId: string | null | undefined) =>
+    teams.find((t) => t.id === teamId)?.name ?? "Без команди";
   return (
     <div>
       <Card className="m-4">
@@ -32,7 +35,7 @@ export function KPIPanel({ proj, onUpdateKPI }: KPIPanelProps) {
                 <div className="text-[13px] font-bold mb-2 flex items-center gap-1.5 text-foreground">
                   <span className={cn("w-2.5 h-2.5 rounded-full inline-block", gac.bg)} />
                   {g.title}
-                  <Badge variant="secondary" className={cn("text-[10px] ml-1", gac.text)}>{g.owner}</Badge>
+                  <Badge variant="secondary" className={cn("text-[10px] ml-1", gac.text)}>{teamName(g.team_id)}</Badge>
                   <span className="text-[10px] text-muted-foreground font-normal">
                     ({medDate(g.startDate)}–{medDate(g.endDate)})
                   </span>

@@ -35,19 +35,27 @@ import {
 import { getAccentDef } from "../../constants";
 import { roleColor } from "../../utils/roleColor";
 import { medDate, diffDays, today } from "../../utils/date";
-import type { Project, ProjectStats, Role } from "../../types";
+import type { Project, ProjectStats, Role, Team } from "../../types";
 import { AlertTriangle, BarChart3, Target, Users, TrendingUp } from "lucide-react";
+
+function svgPoint(viewBox: { cx?: unknown; cy?: unknown }): { cx: number; cy: number } | null {
+  const cx = Number(viewBox.cx);
+  const cy = Number(viewBox.cy);
+  if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null;
+  return { cx, cy };
+}
 
 interface DashboardProps {
   proj: Project;
   stats: ProjectStats;
+  teams: Team[];
 }
 
 
+export function Dashboard({ proj, stats, teams }: DashboardProps) {
+  const teamName = (teamId: string | null | undefined) =>
+    teams.find((t) => t.id === teamId)?.name ?? "Без команди";
 
-
-
-export function Dashboard({ proj, stats }: DashboardProps) {
   const teamStats = useMemo(() => {
     const map: Record<string, { total: number; done: number; inProgress: number }> = {};
     proj.goals.forEach((g) => {
@@ -82,7 +90,7 @@ export function Dashboard({ proj, stats }: DashboardProps) {
     let completed = 0, total = 0;
     const byTeam: Record<string, { kpis: KpiItem[]; goalColor: string | null }> = {};
     proj.goals.forEach((g) => {
-      const team = g.owner;
+      const team = teamName(g.team_id);
       if (!byTeam[team]) byTeam[team] = { kpis: [], goalColor: g.color };
       g.kpis.forEach((k) => {
         total++;
@@ -123,9 +131,10 @@ export function Dashboard({ proj, stats }: DashboardProps) {
   const prioColors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
 
   const goalsPct = stats.totalGoals > 0 ? Math.round((stats.goalsDone / stats.totalGoals) * 100) : 0;
-  const tasksPct = stats.taskPct;
-  const kpiPct = stats.kpiPct;
+  const tasksPct = Number.isFinite(stats.taskPct) ? stats.taskPct : 0;
+  const kpiPct = Number.isFinite(stats.kpiPct) ? stats.kpiPct : 0;
   const avgPct = Math.round((goalsPct + tasksPct + kpiPct) / 3);
+  const avgPctLabel = Number.isFinite(avgPct) ? avgPct : 0;
 
   const overviewData = [
     { name: "KPI", value: kpiPct, fill: "var(--chart-3)" },
@@ -213,18 +222,19 @@ export function Dashboard({ proj, stats }: DashboardProps) {
                               <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
                                 <Label
                                   content={({ viewBox }) => {
-                                    if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                                      return (
-                                        <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
-                                          <tspan x={viewBox.cx} y={(viewBox.cy || 0) - 8} className="fill-foreground text-2xl font-bold">
-                                            {t.pct}%
-                                          </tspan>
-                                          <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 12} className="fill-muted-foreground text-xs">
-                                            {teamDone}/{t.totalCount} KPI
-                                          </tspan>
-                                        </text>
-                                      );
-                                    }
+                                    const pt = viewBox && svgPoint(viewBox as { cx?: unknown; cy?: unknown });
+                                    if (!pt) return null;
+                                    const { cx, cy } = pt;
+                                    return (
+                                      <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+                                        <tspan x={cx} y={cy - 8} className="fill-foreground text-2xl font-bold">
+                                          {t.pct}%
+                                        </tspan>
+                                        <tspan x={cx} y={cy + 12} className="fill-muted-foreground text-xs">
+                                          {teamDone}/{t.totalCount} KPI
+                                        </tspan>
+                                      </text>
+                                    );
                                   }}
                                 />
                               </PolarRadiusAxis>
@@ -325,7 +335,7 @@ export function Dashboard({ proj, stats }: DashboardProps) {
                 <div className="flex flex-col gap-3">
                   {teamStats.map((t) => {
                     const rc = roleColor(t.role);
-                    const goalForRole = proj.goals.find((g) => g.owner === t.role);
+                    const goalForRole = proj.goals.find((g) => teamName(g.team_id) === t.role);
                     const tac = goalForRole ? getAccentDef(goalForRole.color) : { text: rc.text, bg: rc.bg };
                     return (
                       <div key={t.role} className="flex items-center gap-3">
@@ -414,17 +424,21 @@ export function Dashboard({ proj, stats }: DashboardProps) {
                     label={({ cx, cy, value, index }) => {
                       const item = overviewData[index as number];
                       if (!item) return null;
+                      const cxN = Number(cx);
+                      const cyN = Number(cy);
+                      if (!Number.isFinite(cxN) || !Number.isFinite(cyN)) return null;
                       const radii = [50, 70, 90];
                       const r = radii[index as number] ?? 70;
+                      const v = typeof value === "number" && Number.isFinite(value) ? value : item.value;
                       return (
                         <text
-                          x={Number(cx) + r + 4}
-                          y={cy}
+                          x={cxN + r + 4}
+                          y={cyN}
                           textAnchor="start"
                           dominantBaseline="middle"
                           className="fill-muted-foreground text-[10px]"
                         >
-                          {item.name} {value}%
+                          {item.name} {v}%
                         </text>
                       );
                     }}
@@ -436,18 +450,19 @@ export function Dashboard({ proj, stats }: DashboardProps) {
                   <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
                     <Label
                       content={({ viewBox }) => {
-                        if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                          return (
-                            <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
-                              <tspan x={viewBox.cx} y={(viewBox.cy || 0) - 6} className="fill-foreground text-2xl font-bold">
-                                {avgPct}%
-                              </tspan>
-                              <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 12} className="fill-muted-foreground text-[10px]">
-                                загалом
-                              </tspan>
-                            </text>
-                          );
-                        }
+                        const pt = viewBox && svgPoint(viewBox as { cx?: unknown; cy?: unknown });
+                        if (!pt) return null;
+                        const { cx, cy } = pt;
+                        return (
+                          <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+                            <tspan x={cx} y={cy - 6} className="fill-foreground text-2xl font-bold">
+                              {avgPctLabel}%
+                            </tspan>
+                            <tspan x={cx} y={cy + 12} className="fill-muted-foreground text-[10px]">
+                              загалом
+                            </tspan>
+                          </text>
+                        );
                       }}
                     />
                   </PolarRadiusAxis>
@@ -495,7 +510,7 @@ export function Dashboard({ proj, stats }: DashboardProps) {
                       <div className="px-3 pt-3 pb-1">
                         <div className="text-[13px] font-bold truncate">{g.title || "—"}</div>
                         <div className="flex gap-1.5 items-center mt-1 flex-wrap">
-                          <Badge variant="secondary" className={cn("text-[10px]", gac.text)}>{g.owner}</Badge>
+                          <Badge variant="secondary" className={cn("text-[10px]", gac.text)}>{teamName(g.team_id)}</Badge>
                           <Badge variant="outline" className="text-[10px]">📅 {medDate(g.startDate)} – {medDate(g.endDate)}</Badge>
                         </div>
                         <div className="grid grid-cols-2 gap-2 mt-2 text-[10px]">

@@ -18,6 +18,8 @@ import type {
   TaskRow,
   GoalKpiRow,
   ProjectRow,
+  Team,
+  UserProfile,
 } from "../types";
 import type { Role, Priority, GoalStatus, TaskStatus } from "../types";
 
@@ -52,6 +54,7 @@ function taskFromRow(row: TaskRow, links: Link[]): Task {
     desc: row.description,
     links,
     assignee: row.assignee as Role,
+    user_id: row.user_id ?? null,
     startDate: row.start_date,
     endDate: row.end_date,
     status: row.status as TaskStatus,
@@ -102,15 +105,42 @@ export function useProject() {
   const [expandedTasks, setExpandedTasks] = useState<Record<string, boolean>>({});
   const [ganttExpanded, setGanttExpanded] = useState<Record<string, boolean>>({});
   const [kpiDefinitions, setKpiDefinitions] = useState<KpiDefinition[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [teamUsers, setTeamUsers] = useState<Record<string, UserProfile[]>>({});
   const [loading, setLoading] = useState(true);
+
+  const loadTeamUsers = useCallback(async (teamIds: string[]) => {
+    const uniqueIds = [...new Set(teamIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return;
+    const { data } = await supabase
+      .from("users")
+      .select("*")
+      .in("team_id", uniqueIds)
+      .order("first_name", { ascending: true });
+    if (!data) return;
+    const map: Record<string, UserProfile[]> = {};
+    for (const u of data as UserProfile[]) {
+      const tid = u.team_id!;
+      if (!map[tid]) map[tid] = [];
+      map[tid].push(u);
+    }
+    setTeamUsers((prev) => ({ ...prev, ...map }));
+  }, []);
 
   /* ─── Load full project tree from Supabase ─── */
   const loadProjects = useCallback(async () => {
-    const { data: kpiDefs } = await supabase
-      .from("kpi_definitions")
-      .select("*")
-      .order("name", { ascending: true });
+    const [{ data: kpiDefs }, { data: teamRows }] = await Promise.all([
+      supabase
+        .from("kpi_definitions")
+        .select("*")
+        .order("name", { ascending: true }),
+      supabase
+        .from("teams")
+        .select("*")
+        .order("name", { ascending: true }),
+    ]);
     setKpiDefinitions((kpiDefs as KpiDefinition[]) ?? []);
+    setTeams((teamRows as Team[]) ?? []);
 
     const { data: projRows } = await supabase
       .from("projects")
@@ -212,25 +242,33 @@ export function useProject() {
       createdAt: new Date(pr.created_at).getTime(),
     }));
 
+    const goalTeamIds = allGoals.map((g) => g.team_id).filter(Boolean) as string[];
+    if (goalTeamIds.length > 0) {
+      await loadTeamUsers(goalTeamIds);
+    }
+
     setProjects(loaded);
     if (!activeProjectId || !loaded.find((p) => p.id === activeProjectId)) {
       setActive(loaded[0]?.id ?? "");
     }
     setLoading(false);
-  }, [isAdmin, userTeamId, activeProjectId]);
+  }, [isAdmin, userTeamId, activeProjectId, loadTeamUsers]);
 
   useEffect(() => {
     loadProjects();
   }, [loadProjects]);
 
   const proj = useMemo(
-    () => projects.find((p) => p.id === activeProjectId) ?? projects[0] ?? {
-      id: "",
-      name: "",
-      desc: "",
-      goals: [],
-      createdAt: Date.now(),
-    },
+    () =>
+      projects.find((p) => p.id === activeProjectId) ??
+      projects[0] ?? {
+        id: "",
+        name: "",
+        desc: "",
+        color: null,
+        goals: [],
+        createdAt: Date.now(),
+      },
     [projects, activeProjectId],
   );
 
@@ -362,29 +400,23 @@ export function useProject() {
     setTab("dash");
   };
 
-  /* ─── Project field updaters ─── */
-  const updateProjName = async (v: string) => {
-    updateLocalProj((p) => ({ ...p, name: v }));
-    await supabase
+  /* ─── Project field updaters (dialog saves name + desc + color in one request) ─── */
+  const updateProjectSettings = async (
+    name: string,
+    desc: string,
+    color: string,
+  ) => {
+    const id = activeProjectId;
+    if (!id) return;
+    updateLocalProj((p) => ({ ...p, name, desc, color }));
+    const { error } = await supabase
       .from("projects")
-      .update({ name: v })
-      .eq("id", activeProjectId);
-  };
-
-  const updateProjDesc = async (v: string) => {
-    updateLocalProj((p) => ({ ...p, desc: v }));
-    await supabase
-      .from("projects")
-      .update({ description: v })
-      .eq("id", activeProjectId);
-  };
-
-  const updateProjColor = async (v: string) => {
-    updateLocalProj((p) => ({ ...p, color: v }));
-    await supabase
-      .from("projects")
-      .update({ color: v })
-      .eq("id", activeProjectId);
+      .update({ name, description: desc, color })
+      .eq("id", id);
+    if (error) {
+      console.error("updateProjectSettings", error);
+      void loadProjects();
+    }
   };
 
   /* ─── Goal actions ─── */
@@ -427,6 +459,29 @@ export function useProject() {
     field: keyof Goal,
     value: unknown,
   ) => {
+    if (field === "team_id") {
+      updateLocalGoal(gid, (g) => ({
+        ...g,
+        team_id: value as string | null,
+        tasks: g.tasks.map((t) => ({ ...t, user_id: null })),
+      }));
+      await supabase.from("goals").update({ team_id: value }).eq("id", gid);
+      const g = proj.goals.find((x) => x.id === gid);
+      if (g) {
+        const taskIds = g.tasks.map((t) => t.id);
+        if (taskIds.length > 0) {
+          await supabase
+            .from("tasks")
+            .update({ user_id: null })
+            .in("id", taskIds);
+        }
+      }
+      if (value) {
+        await loadTeamUsers([value as string]);
+      }
+      return;
+    }
+
     updateLocalGoal(gid, (g) => ({ ...g, [field]: value }));
     const dbField =
       field === "startDate"
@@ -488,6 +543,7 @@ export function useProject() {
         title: "Нова задача",
         description: "",
         assignee: "SMM",
+        user_id: null,
         status: "To Do",
         start_date: sd,
         end_date: taskEnd,
@@ -533,6 +589,7 @@ export function useProject() {
           title: u.title,
           description: u.desc,
           assignee: u.assignee,
+          user_id: u.user_id,
           status: u.status,
           start_date: u.startDate,
           end_date: u.endDate,
@@ -648,14 +705,14 @@ export function useProject() {
     ganttRange,
     ganttMonths,
     kpiDefinitions,
+    teams,
+    teamUsers,
     toggleTask,
     toggleGanttGoal,
     addProject,
     deleteProject,
     switchProject,
-    updateProjName,
-    updateProjDesc,
-    updateProjColor,
+    updateProjectSettings,
     addGoal,
     removeGoal,
     updateGoalField,

@@ -108,6 +108,7 @@ export interface Task {
   desc: string;
   links: Link[];
   assignee: Role;
+  user_id: string | null;
   startDate: string;
   endDate: string;
   status: TaskStatus;
@@ -121,6 +122,7 @@ export interface TaskRow {
   title: string;
   description: string;
   assignee: string;
+  user_id: string | null;
   status: string;
   start_date: string;
   end_date: string;

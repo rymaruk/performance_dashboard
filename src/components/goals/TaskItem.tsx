@@ -27,21 +27,23 @@ import {
 } from "../ui/item";
 import { getAccentDef } from "../../constants";
 import { useConfirmAction } from "../../hooks/ConfirmContext";
-import { TSTAT, TASK_ROLES } from "../../constants";
+import { TSTAT } from "../../constants";
 import {
   ChevronRight,
   X,
   FileText,
   Link as LinkIcon,
   User,
+  UserX,
   CircleDot,
   ChevronDown,
 } from "lucide-react";
-import type { Task, Goal } from "../../types";
+import type { Task, Goal, UserProfile } from "../../types";
 
 interface TaskItemProps {
   task: Task;
   goal: Goal;
+  teamUsers: UserProfile[];
   isOpen: boolean;
   onToggle: () => void;
   onUpdate: (fn: (t: Task) => Task) => void;
@@ -60,6 +62,7 @@ const TSTAT_STYLES: Record<string, string> = {
 export function TaskItem({
   task: t,
   goal: g,
+  teamUsers,
   isOpen,
   onToggle,
   onUpdate,
@@ -112,35 +115,52 @@ export function TaskItem({
                   "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
                   "cursor-pointer outline-none transition-colors hover:opacity-80",
                   "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-                  ac.bgLight,
-                  ac.text,
+                  t.user_id ? ac.bgLight : "bg-muted",
+                  t.user_id ? ac.text : "text-muted-foreground",
                 )}
               >
-                <User className="size-2.5" />
-                {t.assignee}
+                {t.user_id ? <User className="size-2.5" /> : <UserX className="size-2.5" />}
+                {(() => {
+                  if (!t.user_id) return "Не призначено";
+                  const u = teamUsers.find((u) => u.id === t.user_id);
+                  return u ? `${u.first_name} ${u.last_name}` : "Не призначено";
+                })()}
                 <ChevronDown className="size-2.5 opacity-50" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-[130px]">
+            <DropdownMenuContent align="start" className="min-w-[160px]">
               <DropdownMenuLabel>Виконавець</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
-                {TASK_ROLES.map((role) => (
-                  <DropdownMenuItem
-                    key={role}
-                    className={cn(
-                      t.assignee === role && "bg-accent font-semibold",
-                    )}
-                    onSelect={() =>
-                      onUpdate((tt) => ({
-                        ...tt,
-                        assignee: role as Task["assignee"],
-                      }))
-                    }
-                  >
-                    {role}
+                <DropdownMenuItem
+                  className={cn(!t.user_id && "bg-accent font-semibold")}
+                  onSelect={() =>
+                    onUpdate((tt) => ({ ...tt, user_id: null }))
+                  }
+                >
+                  <UserX className="size-3 mr-1.5 text-muted-foreground" />
+                  Не призначено
+                </DropdownMenuItem>
+                {teamUsers.length === 0 ? (
+                  <DropdownMenuItem disabled className="text-[11px] text-muted-foreground italic">
+                    {g.team_id ? "Немає користувачів у команді" : "Спочатку оберіть команду для цілі"}
                   </DropdownMenuItem>
-                ))}
+                ) : (
+                  teamUsers.map((u) => (
+                    <DropdownMenuItem
+                      key={u.id}
+                      className={cn(
+                        t.user_id === u.id && "bg-accent font-semibold",
+                      )}
+                      onSelect={() =>
+                        onUpdate((tt) => ({ ...tt, user_id: u.id }))
+                      }
+                    >
+                      <User className="size-3 mr-1.5" />
+                      {u.first_name} {u.last_name}
+                    </DropdownMenuItem>
+                  ))
+                )}
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
