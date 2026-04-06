@@ -44,6 +44,7 @@ interface TaskItemProps {
   task: Task;
   goal: Goal;
   teamUsers: UserProfile[];
+  isAdmin: boolean;
   isOpen: boolean;
   onToggle: () => void;
   onUpdate: (fn: (t: Task) => Task) => void;
@@ -63,6 +64,7 @@ export function TaskItem({
   task: t,
   goal: g,
   teamUsers,
+  isAdmin,
   isOpen,
   onToggle,
   onUpdate,
@@ -108,62 +110,81 @@ export function TaskItem({
         </Field>
 
         <div onClick={(e) => e.stopPropagation()}>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                  "cursor-pointer outline-none transition-colors hover:opacity-80",
-                  "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-                  t.user_id ? ac.bgLight : "bg-muted",
-                  t.user_id ? ac.text : "text-muted-foreground",
-                )}
-              >
-                {t.user_id ? <User className="size-2.5" /> : <UserX className="size-2.5" />}
-                {(() => {
-                  if (!t.user_id) return "Не призначено";
-                  const u = teamUsers.find((u) => u.id === t.user_id);
-                  return u ? `${u.first_name} ${u.last_name}` : "Не призначено";
-                })()}
-                <ChevronDown className="size-2.5 opacity-50" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-[160px]">
-              <DropdownMenuLabel>Виконавець</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuItem
-                  className={cn(!t.user_id && "bg-accent font-semibold")}
-                  onSelect={() =>
-                    onUpdate((tt) => ({ ...tt, user_id: null }))
-                  }
+          {isAdmin ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                    "cursor-pointer outline-none transition-colors hover:opacity-80",
+                    "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                    t.user_id ? ac.bgLight : "bg-muted",
+                    t.user_id ? ac.text : "text-muted-foreground",
+                  )}
                 >
-                  <UserX className="size-3 mr-1.5 text-muted-foreground" />
-                  Не призначено
-                </DropdownMenuItem>
-                {teamUsers.length === 0 ? (
-                  <DropdownMenuItem disabled className="text-[11px] text-muted-foreground italic">
-                    {g.team_id ? "Немає користувачів у команді" : "Спочатку оберіть команду для цілі"}
+                  {t.user_id ? <User className="size-2.5" /> : <UserX className="size-2.5" />}
+                  {(() => {
+                    if (!t.user_id) return "Не призначено";
+                    const u = teamUsers.find((u) => u.id === t.user_id);
+                    return u ? `${u.first_name} ${u.last_name}` : "Не призначено";
+                  })()}
+                  <ChevronDown className="size-2.5 opacity-50" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[160px]">
+                <DropdownMenuLabel>Виконавець</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem
+                    className={cn(!t.user_id && "bg-accent font-semibold")}
+                    onSelect={() =>
+                      onUpdate((tt) => ({ ...tt, user_id: null }))
+                    }
+                  >
+                    <UserX className="size-3 mr-1.5 text-muted-foreground" />
+                    Не призначено
                   </DropdownMenuItem>
-                ) : (
-                  teamUsers.map((u) => (
-                    <DropdownMenuItem
-                      key={u.id}
-                      className={cn(
-                        t.user_id === u.id && "bg-accent font-semibold",
-                      )}
-                      onSelect={() =>
-                        onUpdate((tt) => ({ ...tt, user_id: u.id }))
-                      }
-                    >
-                      <User className="size-3 mr-1.5" />
-                      {u.first_name} {u.last_name}
+                  {teamUsers.length === 0 ? (
+                    <DropdownMenuItem disabled className="text-[11px] text-muted-foreground italic">
+                      {g.team_id ? "Немає користувачів у команді" : "Спочатку оберіть команду для цілі"}
                     </DropdownMenuItem>
-                  ))
-                )}
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  ) : (
+                    teamUsers.map((u) => (
+                      <DropdownMenuItem
+                        key={u.id}
+                        className={cn(
+                          t.user_id === u.id && "bg-accent font-semibold",
+                        )}
+                        onSelect={() =>
+                          onUpdate((tt) => ({ ...tt, user_id: u.id }))
+                        }
+                      >
+                        <User className="size-3 mr-1.5" />
+                        {u.first_name} {u.last_name}
+                      </DropdownMenuItem>
+                    ))
+                  )}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <div
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                "cursor-default select-none",
+                t.user_id ? ac.bgLight : "bg-muted",
+                t.user_id ? ac.text : "text-muted-foreground",
+              )}
+            >
+              {t.user_id ? <User className="size-2.5" /> : <UserX className="size-2.5" />}
+              {(() => {
+                if (!t.user_id) return "Не призначено";
+                const u = teamUsers.find((u) => u.id === t.user_id);
+                return u ? `${u.first_name} ${u.last_name}` : "Не призначено";
+              })()}
+            </div>
+          )}
         </div>
 
         <div onClick={(e) => e.stopPropagation()}>

@@ -97,7 +97,7 @@ function clampTasks(tasks: Task[], gs: string, ge: string): Task[] {
 /* ── main hook ── */
 
 export function useProject() {
-  const { isAdmin, userTeamId } = useAuth();
+  const { isAdmin, userTeamId, profile } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActive] = useState<string>("");
   const [tab, setTab] = useState<TabKey>("dash");
@@ -233,7 +233,7 @@ export function useProject() {
       goalsByProject.set(gr.project_id, arr);
     }
 
-    const loaded: Project[] = projRows.map((pr: ProjectRow) => ({
+    let loaded: Project[] = projRows.map((pr: ProjectRow) => ({
       id: pr.id,
       name: pr.name,
       desc: pr.description,
@@ -241,6 +241,17 @@ export function useProject() {
       goals: goalsByProject.get(pr.id) ?? [],
       createdAt: new Date(pr.created_at).getTime(),
     }));
+
+    if (!isAdmin) {
+      const uid = profile?.id;
+      if (!uid) {
+        loaded = [];
+      } else {
+        loaded = loaded.filter((p) =>
+          p.goals.some((g) => g.tasks.some((t) => t.user_id === uid)),
+        );
+      }
+    }
 
     const goalTeamIds = allGoals.map((g) => g.team_id).filter(Boolean) as string[];
     if (goalTeamIds.length > 0) {
@@ -252,7 +263,7 @@ export function useProject() {
       setActive(loaded[0]?.id ?? "");
     }
     setLoading(false);
-  }, [isAdmin, userTeamId, activeProjectId, loadTeamUsers]);
+  }, [isAdmin, userTeamId, profile?.id, activeProjectId, loadTeamUsers]);
 
   useEffect(() => {
     loadProjects();
@@ -367,6 +378,7 @@ export function useProject() {
 
   /* ─── Project actions ─── */
   const addProject = async () => {
+    if (!isAdmin) return;
     const projColor = ACCENT_COLORS[projects.length % ACCENT_COLORS.length].key;
     const { data, error } = await supabase
       .from("projects")
@@ -388,6 +400,7 @@ export function useProject() {
   };
 
   const deleteProject = async (id: string) => {
+    if (!isAdmin) return;
     if (projects.length <= 1) return;
     await supabase.from("projects").delete().eq("id", id);
     const nx = projects.find((p) => p.id !== id)!;
@@ -406,6 +419,7 @@ export function useProject() {
     desc: string,
     color: string,
   ) => {
+    if (!isAdmin) return;
     const id = activeProjectId;
     if (!id) return;
     updateLocalProj((p) => ({ ...p, name, desc, color }));

@@ -229,16 +229,17 @@ export function TeamsPage() {
 
                   <Button
                     type="button"
-                    size="sm"
+                    size="icon"
                     variant="destructive"
-                    className="shrink-0 gap-1 text-[11px]"
+                    className="size-8 shrink-0"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDelete(t);
                     }}
+                    aria-label="Видалити команду"
+                    title="Видалити"
                   >
                     <Trash2 className="size-3.5" />
-                    Видалити
                   </Button>
                 </div>
 

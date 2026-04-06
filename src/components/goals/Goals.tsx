@@ -12,6 +12,7 @@ interface GoalsProps {
   kpiDefinitions: KpiDefinition[];
   teams: Team[];
   teamUsers: Record<string, UserProfile[]>;
+  isAdmin: boolean;
   openGoalIds: string[];
   onOpenGoalIdsChange: (ids: string[]) => void;
   expandedTasks: Record<string, boolean>;
@@ -36,6 +37,7 @@ export function Goals({
   kpiDefinitions,
   teams,
   teamUsers,
+  isAdmin,
   openGoalIds,
   onOpenGoalIdsChange,
   expandedTasks,
@@ -176,6 +178,7 @@ export function Goals({
             goal={g}
             kpiDefinitions={kpiDefinitions}
             teams={teams}
+            isAdmin={isAdmin}
             teamUsers={g.team_id ? teamUsers[g.team_id] ?? [] : []}
             expandedTasks={expandedTasks}
             filteredTaskIds={filteredTaskIdsByGoal[g.id] ?? null}

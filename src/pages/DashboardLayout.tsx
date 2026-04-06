@@ -7,9 +7,11 @@ import { KPIPanel } from "../components/kpi/KPIPanel";
 import { Gantt } from "../components/gantt/Gantt";
 import { Button } from "../components/ui/button";
 import { useProject } from "../hooks/useProject";
+import { useAuth } from "../hooks/AuthContext";
 import { cn } from "@/lib/utils";
 
 export function DashboardLayout() {
+  const { isAdmin } = useAuth();
   const {
     projects,
     proj,
@@ -77,6 +79,7 @@ export function DashboardLayout() {
         onSaveProject={updateProjectSettings}
         onDelete={() => proj.id && deleteProject(proj.id)}
         onAddProject={addProject}
+        isAdmin={isAdmin}
       />
 
       {hasProjects ? (
@@ -92,6 +95,7 @@ export function DashboardLayout() {
                 kpiDefinitions={kpiDefinitions}
                 teams={teams}
                 teamUsers={teamUsers}
+                isAdmin={isAdmin}
                 openGoalIds={openGoalIds}
                 onOpenGoalIdsChange={setOpenGoalIds}
                 expandedTasks={expandedTasks}
@@ -141,14 +145,18 @@ export function DashboardLayout() {
         >
           <FolderOpen className="size-16 mb-4 text-muted-foreground" />
           <div className="text-base font-bold text-foreground mb-2">
-            Немає проектів
+            {isAdmin ? "Немає проектів" : "Немає доступних проектів"}
           </div>
-          <div className="text-[13px] text-muted-foreground mb-5">
-            Створіть перший проект, щоб почати роботу
+          <div className="text-[13px] text-muted-foreground mb-5 text-center max-w-sm">
+            {isAdmin
+              ? "Створіть перший проект, щоб почати роботу"
+              : "Тут відображаються лише проєкти, де вам призначені задачі. Зверніться до адміністратора, якщо потрібен доступ."}
           </div>
-          <Button type="button" onClick={addProject}>
-            ＋ Створити проект
-          </Button>
+          {isAdmin && (
+            <Button type="button" onClick={addProject}>
+              ＋ Створити проект
+            </Button>
+          )}
         </div>
       )}
 

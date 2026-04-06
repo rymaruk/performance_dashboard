@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, Loader2, Plus } from "lucide-react";
+import { ChevronRight, Loader2, Plus, Trash2 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/AuthContext";
 import { useConfirmAction } from "../hooks/ConfirmContext";
@@ -167,12 +167,14 @@ export function KpiManagePage() {
   const saveEdit = async () => {
     if (!editingId || !editName.trim()) return;
     setError(null);
+    const targetNum = Number(editTarget) || 100;
+    const prev = kpis.find((k) => k.id === editingId);
     const { error: e } = await supabase
       .from("kpi_definitions")
       .update({
         name: editName.trim(),
         unit: editUnit.trim() || "%",
-        target_value: Number(editTarget) || 100,
+        target_value: targetNum,
         description: editDesc.trim(),
         color: editColor,
       })
@@ -181,6 +183,18 @@ export function KpiManagePage() {
       setError(e.message.includes("idx_kpi_definitions_name") ? "KPI з такою назвою вже існує" : e.message);
       return;
     }
+
+    if (prev && Number(prev.target_value) !== targetNum) {
+      const { error: jErr } = await supabase
+        .from("goal_kpis")
+        .update({ target_value: targetNum })
+        .eq("kpi_definition_id", editingId);
+      if (jErr) {
+        setError(jErr.message);
+        return;
+      }
+    }
+
     setEditingId(null);
     load();
   };
@@ -195,13 +209,14 @@ export function KpiManagePage() {
       <div className="mx-auto max-w-4xl px-4 py-6">
         <Card className="mb-5 py-5">
           <CardContent className="space-y-3 px-5 pt-0">
-            <div className="text-sm font-semibold text-foreground">Створити новий KPI показник</div>
-            <div className="grid grid-cols-[auto_1fr_80px_80px] gap-2.5 items-end">
-              <div className="space-y-1">
-                <Label className="text-[11px] text-muted-foreground">Колір</Label>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm font-semibold text-foreground">Створити новий KPI показник</div>
+              <div className="flex items-center gap-2">
                 <ColorPicker value={newColor} onChange={setNewColor} />
               </div>
-              <div className="space-y-1">
+            </div>
+            <div className="grid grid-cols-[1fr_80px_80px] gap-2.5 items-end">
+              <div className="space-y-1 min-w-0">
                 <Label htmlFor="kpi-name" className="text-[11px] text-muted-foreground">Назва *</Label>
                 <Input
                   id="kpi-name"
@@ -245,7 +260,10 @@ export function KpiManagePage() {
                   onChange={(e) => setNewDesc(e.target.value)}
                 />
               </div>
-              <Button type="button" onClick={handleAdd} className="shrink-0 gap-1 whitespace-nowrap text-[13px] font-semibold">
+            </div>
+            <div className="flex pt-2">
+
+            <Button type="button" onClick={handleAdd} className="shrink-0 gap-1 whitespace-nowrap text-[13px] font-semibold">
                 <Plus className="size-4" />
                 Створити
               </Button>
@@ -346,12 +364,15 @@ export function KpiManagePage() {
                             <span tabIndex={kpi.goals.length > 0 ? 0 : undefined}>
                               <Button
                                 type="button"
-                                size="sm"
+                                size="icon"
                                 variant="destructive"
+                                className="size-8 shrink-0"
                                 disabled={kpi.goals.length > 0}
                                 onClick={() => handleDelete(kpi)}
+                                aria-label="Видалити KPI"
+                                title="Видалити"
                               >
-                                Видалити
+                                <Trash2 className="size-3.5" />
                               </Button>
                             </span>
                           </TooltipTrigger>

@@ -6,6 +6,7 @@ import App from "./App.tsx";
 import { ConfirmProvider } from "./hooks/ConfirmContext";
 import { AuthProvider } from "./hooks/AuthContext";
 import { ThemeProvider } from "./components/theme-provider";
+import { Toaster } from "./components/ui/sonner";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -16,6 +17,7 @@ createRoot(document.getElementById("root")!).render(
             <App />
           </ConfirmProvider>
         </AuthProvider>
+        <Toaster richColors closeButton position="top-right" />
       </ThemeProvider>
     </BrowserRouter>
   </StrictMode>,

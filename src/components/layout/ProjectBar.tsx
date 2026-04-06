@@ -38,6 +38,8 @@ interface ProjectBarProps {
   onSaveProject: (name: string, desc: string, color: string) => void;
   onDelete: () => void;
   onAddProject: () => void;
+  /** When false, user only switches projects; no create/edit/delete UI. */
+  isAdmin?: boolean;
 }
 
 export function ProjectBar({
@@ -47,6 +49,7 @@ export function ProjectBar({
   onSaveProject,
   onDelete,
   onAddProject,
+  isAdmin = true,
 }: ProjectBarProps) {
   const confirm = useConfirmAction();
   const proj = projects.find((p) => p.id === activeProjectId);
@@ -73,7 +76,9 @@ export function ProjectBar({
     <div className="bg-card border-b border-border px-4 py-2 flex items-center gap-2 overflow-x-auto">
       {projects.length === 0 && (
         <span className="text-xs text-muted-foreground">
-          Немає проектів — додайте перший
+          {isAdmin
+            ? "Немає проектів — додайте перший"
+            : "Немає проектів із вашими призначеними задачами"}
         </span>
       )}
 
@@ -106,7 +111,7 @@ export function ProjectBar({
                       {p.name}
                     </ItemTitle>
                   </ItemContent>
-                  {isActive && (
+                  {isActive && isAdmin && (
                     <ItemActions>
                       <Button
                         variant="ghost"
@@ -134,9 +139,11 @@ export function ProjectBar({
         );
       })}
 
-      <Button onClick={onAddProject} size="sm" className="ml-auto shrink-0">
-        <Plus className="size-3.5" /> Проект
-      </Button>
+      {isAdmin && (
+        <Button onClick={onAddProject} size="sm" className="ml-auto shrink-0">
+          <Plus className="size-3.5" /> Проект
+        </Button>
+      )}
 
       {proj && (
         <Dialog open={open} onOpenChange={setOpen}>

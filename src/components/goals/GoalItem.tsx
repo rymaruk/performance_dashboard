@@ -51,6 +51,7 @@ interface GoalItemProps {
   goal: Goal;
   kpiDefinitions: KpiDefinition[];
   teams: Team[];
+  isAdmin: boolean;
   teamUsers: UserProfile[];
   expandedTasks: Record<string, boolean>;
   filteredTaskIds?: Set<string> | null;
@@ -88,6 +89,7 @@ export function GoalItem({
   goal: g,
   kpiDefinitions,
   teams,
+  isAdmin,
   teamUsers,
   expandedTasks,
   filteredTaskIds,
@@ -150,68 +152,83 @@ export function GoalItem({
         </div>
 
         <div onClick={(e) => e.stopPropagation()}>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
-                  "cursor-pointer outline-none transition-colors hover:opacity-80",
-                  "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-                  g.team_id ? ac.bgLight : "bg-muted",
-                  g.team_id ? ac.text : "text-muted-foreground",
-                )}
-              >
-                <Users className="size-3" />
-                {teams.find((t) => t.id === g.team_id)?.name ?? "Без команди"}
-                <ChevronDown className="size-3 opacity-50" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-[160px]">
-              <DropdownMenuLabel>Команда</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuItem
-                  className={cn(!g.team_id && "bg-accent font-semibold")}
-                  onSelect={() => {
-                    if (!g.team_id) return;
-                    const hasAssigned = g.tasks.some((t) => t.user_id);
-                    if (hasAssigned) {
-                      confirm(
-                        "Зміна команди зніме призначених користувачів з усіх задач. Продовжити?",
-                        () => onUpdateField("team_id", null),
-                      );
-                    } else {
-                      onUpdateField("team_id", null);
-                    }
-                  }}
+          {isAdmin ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
+                    "cursor-pointer outline-none transition-colors hover:opacity-80",
+                    "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                    g.team_id ? ac.bgLight : "bg-muted",
+                    g.team_id ? ac.text : "text-muted-foreground",
+                  )}
                 >
-                  Без команди
-                </DropdownMenuItem>
-                {teams.map((team) => (
+                  <Users className="size-3" />
+                  {teams.find((t) => t.id === g.team_id)?.name ?? "Без команди"}
+                  <ChevronDown className="size-3 opacity-50" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[160px]">
+                <DropdownMenuLabel>Команда</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
                   <DropdownMenuItem
-                    key={team.id}
-                    className={cn(
-                      g.team_id === team.id && "bg-accent font-semibold",
-                    )}
+                    className={cn(!g.team_id && "bg-accent font-semibold")}
                     onSelect={() => {
-                      if (team.id === g.team_id) return;
+                      if (!g.team_id) return;
                       const hasAssigned = g.tasks.some((t) => t.user_id);
                       if (hasAssigned) {
                         confirm(
                           "Зміна команди зніме призначених користувачів з усіх задач. Продовжити?",
-                          () => onUpdateField("team_id", team.id),
+                          () => onUpdateField("team_id", null),
                         );
                       } else {
-                        onUpdateField("team_id", team.id);
+                        onUpdateField("team_id", null);
                       }
                     }}
                   >
-                    {team.name}
+                    Без команди
                   </DropdownMenuItem>
-                ))}
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  {teams.map((team) => (
+                    <DropdownMenuItem
+                      key={team.id}
+                      className={cn(
+                        g.team_id === team.id && "bg-accent font-semibold",
+                      )}
+                      onSelect={() => {
+                        if (team.id === g.team_id) return;
+                        const hasAssigned = g.tasks.some((t) => t.user_id);
+                        if (hasAssigned) {
+                          confirm(
+                            "Зміна команди зніме призначених користувачів з усіх задач. Продовжити?",
+                            () => onUpdateField("team_id", team.id),
+                          );
+                        } else {
+                          onUpdateField("team_id", team.id);
+                        }
+                      }}
+                    >
+                      {team.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <div
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
+                "cursor-default select-none",
+                g.team_id ? ac.bgLight : "bg-muted",
+                g.team_id ? ac.text : "text-muted-foreground",
+              )}
+            >
+              <Users className="size-3" />
+              {teams.find((t) => t.id === g.team_id)?.name ?? "Без команди"}
+            </div>
+          )}
         </div>
 
         <div onClick={(e) => e.stopPropagation()}>
@@ -357,6 +374,7 @@ export function GoalItem({
               task={t}
               goal={g}
               teamUsers={teamUsers}
+              isAdmin={isAdmin}
               isOpen={!!expandedTasks[t.id]}
               onToggle={() => onToggleTask(t.id)}
               onUpdate={(fn) => onUpdateTask(t.id, fn)}

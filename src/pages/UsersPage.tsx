@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Plus } from "lucide-react";
+import { toast } from "sonner";
+import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/AuthContext";
 import { useConfirmAction } from "../hooks/ConfirmContext";
-import { getAccentDef, DEFAULT_ACCENT } from "../constants";
+import { DEFAULT_ACCENT, getAccentDef } from "../constants";
 import type { AccentColor } from "../constants";
 import type { UserProfile, Team } from "../types";
 import { cn } from "@/lib/utils";
@@ -25,9 +26,10 @@ import {
 } from "@/components/ui/select";
 import { SidebarPageLayout } from "../components/layout/SidebarPageLayout";
 
-interface ProjectRow {
-  id: string;
-  name: string;
+const SEED_ADMIN_ID = "00000000-0000-0000-0000-000000000001";
+
+function isSeedAdminId(id: string) {
+  return id === SEED_ADMIN_ID;
 }
 
 export function UsersPage() {
@@ -37,10 +39,10 @@ export function UsersPage() {
 
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
-  const [_projects, setProjects] = useState<ProjectRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
 
   const [fFirstName, setFFirstName] = useState("");
   const [fLastName, setFLastName] = useState("");
@@ -50,17 +52,15 @@ export function UsersPage() {
   const [fRole, setFRole] = useState<"admin" | "user">("user");
   const [fTeamId, setFTeamId] = useState("");
   const [fColor, setFColor] = useState<AccentColor>(DEFAULT_ACCENT);
-  const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    const [usersRes, teamsRes, projRes] = await Promise.all([
+    const [usersRes, teamsRes] = await Promise.all([
       supabase.from("users").select("*, team:teams(*)").order("created_at", { ascending: true }),
       supabase.from("teams").select("*").order("created_at", { ascending: true }),
-      supabase.from("projects").select("id, name").order("created_at", { ascending: true }),
     ]);
     setUsers((usersRes.data as unknown as UserProfile[]) ?? []);
     setTeams((teamsRes.data as Team[]) ?? []);
-    setProjects((projRes.data as ProjectRow[]) ?? []);
     setLoading(false);
   }, []);
 
@@ -73,7 +73,7 @@ export function UsersPage() {
     return null;
   }
 
-  const resetForm = () => {
+  const clearFormFields = () => {
     setFFirstName("");
     setFLastName("");
     setFEmail("");
@@ -82,16 +82,50 @@ export function UsersPage() {
     setFRole("user");
     setFTeamId("");
     setFColor(DEFAULT_ACCENT);
+    setEditingUser(null);
+  };
+
+  const cancelForm = () => {
+    clearFormFields();
     setShowForm(false);
+    setError(null);
+  };
+
+  const openCreateForm = () => {
+    clearFormFields();
+    setError(null);
+    setShowForm(true);
+  };
+
+  const openEditForm = (u: UserProfile) => {
+    setError(null);
+    setEditingUser(u);
+    setFFirstName(u.first_name);
+    setFLastName(u.last_name);
+    setFEmail(u.email);
+    setFLogin(u.login);
+    setFRole(u.role);
+    setFTeamId(u.team_id ?? "");
+    setFColor(((u.color ?? DEFAULT_ACCENT) as AccentColor) ?? DEFAULT_ACCENT);
+    setFPassword("");
+    setShowForm(true);
   };
 
   const handleCreate = async () => {
     if (!fEmail.trim() || !fPassword.trim() || !fFirstName.trim() || !fLastName.trim() || !fLogin.trim()) {
-      setError("Заповніть усі обовʼязкові поля");
+      const msg = "Заповніть усі обовʼязкові поля (включно з паролем)";
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+    if (fPassword.trim().length < 6) {
+      const msg = "Пароль має бути не коротшим за 6 символів";
+      setError(msg);
+      toast.error(msg);
       return;
     }
     setError(null);
-    setCreating(true);
+    setSaving(true);
     const { error: signupErr } = await supabase.auth.signUp({
       email: fEmail.trim(),
       password: fPassword,
@@ -108,17 +142,114 @@ export function UsersPage() {
     });
     if (signupErr) {
       setError(signupErr.message);
-      setCreating(false);
+      toast.error(signupErr.message);
+      setSaving(false);
       return;
     }
-    resetForm();
-    setCreating(false);
+    cancelForm();
+    setSaving(false);
+    toast.success("Користувача створено");
     setTimeout(load, 1000);
   };
 
-  const handleDelete = (u: UserProfile) => {
-    if (u.id === "00000000-0000-0000-0000-000000000001") {
-      setError("Системний адміністратор не може бути видалений");
+  const handleUpdate = async () => {
+    if (!editingUser) return;
+    if (!fEmail.trim() || !fFirstName.trim() || !fLastName.trim() || !fLogin.trim()) {
+      const msg = "Заповніть усі обовʼязкові поля";
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+    const pw = fPassword.trim();
+    if (pw.length > 0 && pw.length < 6) {
+      const msg = "Пароль має бути не коротшим за 6 символів";
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    setError(null);
+    setSaving(true);
+
+    const payload = {
+      target_user_id: editingUser.id,
+      p_first_name: fFirstName.trim(),
+      p_last_name: fLastName.trim(),
+      p_email: fEmail.trim(),
+      p_login: fLogin.trim(),
+      p_role: isSeedAdminId(editingUser.id) ? "admin" : fRole,
+      p_team_id: isSeedAdminId(editingUser.id) ? null : fTeamId || null,
+      p_color: fColor,
+    };
+
+    const { error: rpcError } = await supabase.rpc("admin_update_user_profile", payload);
+    let saveErr = rpcError;
+
+    const missingRpc =
+      rpcError &&
+      (rpcError.code === "PGRST202" || /could not find the function/i.test(rpcError.message ?? ""));
+
+    if (missingRpc) {
+      const { error: fbErr } = await supabase
+        .from("users")
+        .update({
+          first_name: payload.p_first_name,
+          last_name: payload.p_last_name,
+          email: payload.p_email.toLowerCase(),
+          login: payload.p_login,
+          role: payload.p_role,
+          team_id: payload.p_team_id,
+          color: fColor,
+        })
+        .eq("id", editingUser.id);
+      if (fbErr) {
+        saveErr = fbErr;
+      } else {
+        saveErr = null;
+        toast.info(
+          "Профіль збережено в public.users. Щоб синхронізувати email для входу, виконайте SQL з supabase-admin-update-user-profile-rpc.sql",
+          { duration: 6000 },
+        );
+      }
+    }
+
+    if (saveErr) {
+      setError(saveErr.message);
+      toast.error(saveErr.message);
+      setSaving(false);
+      return;
+    }
+
+    if (pw.length > 0) {
+      const { error: pwdErr } = await supabase.rpc("admin_set_user_password", {
+        target_user_id: editingUser.id,
+        new_password: pw,
+      });
+      if (pwdErr) {
+        const msg = pwdErr.message ?? "";
+        const missingFn =
+          pwdErr.code === "PGRST202" || /could not find the function/i.test(msg);
+        const full = missingFn
+          ? `${msg} Якщо SQL уже виконано: Settings → API → перезавантажте кеш схеми.`
+          : msg;
+        setError(full);
+        toast.error(full);
+        setSaving(false);
+        return;
+      }
+    }
+
+    setSaving(false);
+    cancelForm();
+    toast.success("Користувача оновлено");
+    load();
+  };
+
+  const handleDelete = (u: UserProfile, onDeleted?: () => void) => {
+    if (isSeedAdminId(u.id)) {
+      const msg = "Системний адміністратор не може бути видалений";
+      setError(msg);
+      toast.error(msg);
       return;
     }
     confirm(`Видалити користувача «${u.first_name} ${u.last_name}» (${u.email})?`, async () => {
@@ -126,24 +257,16 @@ export function UsersPage() {
       const { error: e } = await supabase.from("users").delete().eq("id", u.id);
       if (e) {
         setError(e.message);
+        toast.error(e.message);
         return;
       }
+      toast.success("Користувача видалено");
+      onDeleted?.();
       load();
     });
   };
 
-  const handleRoleChange = async (u: UserProfile, newRole: "admin" | "user") => {
-    if (u.id === "00000000-0000-0000-0000-000000000001") return;
-    await supabase.from("users").update({ role: newRole }).eq("id", u.id);
-    load();
-  };
-
-  const handleTeamChange = async (u: UserProfile, newTeamId: string) => {
-    await supabase.from("users").update({ team_id: newTeamId || null }).eq("id", u.id);
-    load();
-  };
-
-  const isSeedAdmin = (id: string) => id === "00000000-0000-0000-0000-000000000001";
+  const editingSeed = editingUser ? isSeedAdminId(editingUser.id) : false;
 
   return (
     <SidebarPageLayout
@@ -155,7 +278,7 @@ export function UsersPage() {
           <Button
             type="button"
             variant={showForm ? "secondary" : "default"}
-            onClick={() => setShowForm((v) => !v)}
+            onClick={() => (showForm ? cancelForm() : openCreateForm())}
             className="gap-1 text-[13px] font-semibold"
           >
             {showForm ? (
@@ -172,7 +295,9 @@ export function UsersPage() {
         {showForm && (
           <Card className="mb-5 py-5">
             <CardHeader className="flex flex-row items-center justify-between gap-3 px-5 pb-0 pt-0 space-y-0">
-              <CardTitle className="text-sm">Створити користувача</CardTitle>
+              <CardTitle className="text-sm">
+                {editingUser ? "Редагувати користувача" : "Створити користувача"}
+              </CardTitle>
               <div className="flex items-center gap-2 shrink-0">
                 <ColorPicker value={fColor} onChange={setFColor} />
               </div>
@@ -186,18 +311,23 @@ export function UsersPage() {
                     value={fLogin}
                     onChange={(e) => setFLogin(e.target.value)}
                     placeholder="andrii_iv"
+                    autoComplete="off"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-[11px] text-muted-foreground">Пароль *</Label>
+                  <Label className="text-[11px] text-muted-foreground">
+                    Пароль {editingUser ? "(необовʼязково)" : "*"}
+                  </Label>
                   <Input
                     type="password"
                     className="text-[13px]"
                     value={fPassword}
                     onChange={(e) => setFPassword(e.target.value)}
-                    placeholder="мін. 6 символів"
+                    placeholder={editingUser ? "залиште порожнім, щоб не змінювати" : "мін. 6 символів"}
+                    autoComplete="new-password"
                   />
                 </div>
+              </div>
               <div className="space-y-1.5">
                 <Label className="text-[11px] text-muted-foreground">Email *</Label>
                 <Input
@@ -206,8 +336,8 @@ export function UsersPage() {
                   value={fEmail}
                   onChange={(e) => setFEmail(e.target.value)}
                   placeholder="user@example.com"
+                  autoComplete="email"
                 />
-              </div>
               </div>
 
               <Separator className="mt-[30px] mb-[30px]" />
@@ -232,55 +362,96 @@ export function UsersPage() {
                   />
                 </div>
               </div>
-              
+
               <Separator className="mt-[30px] mb-[30px]" />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-[11px] text-muted-foreground">Роль</Label>
-                  <Select value={fRole} onValueChange={(v) => setFRole(v as "admin" | "user")}>
-                    <SelectTrigger className="w-full text-[13px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="user">Користувач</SelectItem>
-                        <SelectItem value="admin">Адміністратор</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                  {editingSeed ? (
+                    <Input
+                      className="text-[13px] cursor-default bg-muted text-muted-foreground"
+                      readOnly
+                      tabIndex={-1}
+                      value="Адміністратор (system)"
+                    />
+                  ) : (
+                    <Select value={fRole} onValueChange={(v) => setFRole(v as "admin" | "user")}>
+                      <SelectTrigger className="w-full text-[13px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="user">Користувач</SelectItem>
+                          <SelectItem value="admin">Адміністратор</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-[11px] text-muted-foreground">Команда</Label>
-                  <Select value={fTeamId || "__none__"} onValueChange={(v) => setFTeamId(v === "__none__" ? "" : v)}>
-                    <SelectTrigger className="w-full text-[13px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="__none__">— Без команди —</SelectItem>
-                        {teams
-                          .filter((t) => t.status === "active")
-                          .map((t) => (
-                            <SelectItem key={t.id} value={t.id}>
-                              {t.name}
-                            </SelectItem>
-                          ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                  {editingSeed ? (
+                    <Input
+                      className="text-[13px] cursor-default bg-muted text-muted-foreground"
+                      readOnly
+                      tabIndex={-1}
+                      value="—"
+                    />
+                  ) : (
+                    <Select value={fTeamId || "__none__"} onValueChange={(v) => setFTeamId(v === "__none__" ? "" : v)}>
+                      <SelectTrigger className="w-full text-[13px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="__none__">— Без команди —</SelectItem>
+                          {teams
+                            .filter((t) => t.status === "active")
+                            .map((t) => (
+                              <SelectItem key={t.id} value={t.id}>
+                                {t.name}
+                              </SelectItem>
+                            ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               </div>
-              <Button type="button" onClick={handleCreate} disabled={creating} className="mt-1 font-semibold">
-                {creating ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    Створення…
-                  </>
-                ) : (
-                  "Створити"
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                {editingUser && !editingSeed && (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="destructive"
+                    className="size-9 shrink-0"
+                    disabled={saving}
+                    onClick={() => editingUser && handleDelete(editingUser, cancelForm)}
+                    aria-label="Видалити користувача"
+                    title="Видалити"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
                 )}
-              </Button>
+                <Button
+                  type="button"
+                  onClick={() => void (editingUser ? handleUpdate() : handleCreate())}
+                  disabled={saving}
+                  className="font-semibold min-w-[120px]"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      {editingUser ? "Збереження…" : "Створення…"}
+                    </>
+                  ) : editingUser ? (
+                    "Зберегти"
+                  ) : (
+                    "Створити"
+                  )}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -303,12 +474,12 @@ export function UsersPage() {
           <div className="py-10 text-center text-[13px] text-muted-foreground">Користувачів ще немає</div>
         ) : (
           <Card className="overflow-hidden py-0">
-            <div className="grid grid-cols-[1fr_1fr_120px_160px_80px] gap-2 border-b border-border bg-muted/50 px-5 py-2.5 text-[10px] font-bold uppercase text-muted-foreground">
+            <div className="grid grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_120px_160px_minmax(120px,auto)] gap-2 border-b border-border bg-muted/50 px-5 py-2.5 text-[10px] font-bold uppercase text-muted-foreground">
               <span>Користувач</span>
               <span>Email / Логін</span>
               <span>Роль</span>
               <span>Команда</span>
-              <span />
+              <span className="text-right">Дії</span>
             </div>
 
             {users.map((u, i) => (
@@ -316,16 +487,22 @@ export function UsersPage() {
                 {i > 0 && <Separator />}
                 <div
                   className={cn(
-                    "grid grid-cols-[1fr_1fr_120px_160px_80px] items-center gap-2 px-5 py-3",
-                    isSeedAdmin(u.id) && "bg-accent/50",
+                    "grid grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_120px_160px_minmax(120px,auto)] items-center gap-2 px-5 py-3",
+                    isSeedAdminId(u.id) && "bg-accent/50",
                   )}
                 >
-                  <div className="flex items-center gap-2">
-                    <span className={cn("size-2.5 rounded-full shrink-0", getAccentDef(u.color).bg)} />
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div
+                      className={cn(
+                        "size-7 shrink-0 rounded-full border border-border",
+                        getAccentDef(u.color).bgLight,
+                      )}
+                      title={u.color ?? ""}
+                    />
                     <div>
                       <div className="text-[13px] font-semibold text-foreground">
                         {u.first_name} {u.last_name}
-                        {isSeedAdmin(u.id) && (
+                        {isSeedAdminId(u.id) && (
                           <Badge variant="secondary" className="ml-1.5 align-middle text-[9px] font-bold">
                             SYSTEM
                           </Badge>
@@ -343,61 +520,32 @@ export function UsersPage() {
                   </div>
 
                   <div>
-                    {isSeedAdmin(u.id) ? (
+                    {u.role === "admin" ? (
                       <Badge variant="secondary" className="text-[11px]">
                         Адмін
                       </Badge>
                     ) : (
-                      <Select
-                        value={u.role}
-                        onValueChange={(v) => handleRoleChange(u, v as "admin" | "user")}
-                      >
-                        <SelectTrigger size="sm" className="h-7 max-w-[130px] text-[11px] font-semibold">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectItem value="user">Користувач</SelectItem>
-                            <SelectItem value="admin">Адмін</SelectItem>
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
+                      <Badge variant="outline" className="text-[11px]">
+                        Користувач
+                      </Badge>
                     )}
                   </div>
 
-                  <div>
-                    {isSeedAdmin(u.id) ? (
-                      <span className="text-[11px] text-muted-foreground">—</span>
-                    ) : (
-                      <Select
-                        value={u.team_id ?? "__none__"}
-                        onValueChange={(v) => handleTeamChange(u, v === "__none__" ? "" : v)}
-                      >
-                        <SelectTrigger size="sm" className="h-7 max-w-[150px] text-[11px] font-semibold">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectItem value="__none__">— Немає —</SelectItem>
-                            {teams
-                              .filter((t) => t.status === "active")
-                              .map((t) => (
-                                <SelectItem key={t.id} value={t.id}>
-                                  {t.name}
-                                </SelectItem>
-                              ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    )}
+                  <div className="text-[11px] text-foreground truncate">
+                    {u.team?.name ?? "—"}
                   </div>
 
-                  <div className="text-right">
-                    {!isSeedAdmin(u.id) && (
-                      <Button type="button" size="sm" variant="destructive" onClick={() => handleDelete(u)}>
-                        Видалити
-                      </Button>
-                    )}
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="gap-1 text-[11px]"
+                      onClick={() => openEditForm(u)}
+                    >
+                      <Pencil className="size-3.5" />
+                      Редагувати
+                    </Button>
                   </div>
                 </div>
               </div>
