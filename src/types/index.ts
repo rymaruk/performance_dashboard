@@ -14,6 +14,13 @@ export interface Team {
 
 export type UserRole = "admin" | "user";
 
+/** Кольори кілець «Загальний прогрес» (ключі збігаються з AccentColor у constants). */
+export interface DashboardOverviewAccents {
+  goals: string;
+  tasks: string;
+  kpi: string;
+}
+
 export interface UserProfile {
   id: string;
   first_name: string;
@@ -23,6 +30,8 @@ export interface UserProfile {
   role: UserRole;
   team_id: string | null;
   color: string | null;
+  /** З public.users.dashboard_overview_accents; відсутнє/null = дефолти в UI */
+  dashboard_overview_accents?: DashboardOverviewAccents | null;
   created_at: string;
   team?: Team | null;
 }
