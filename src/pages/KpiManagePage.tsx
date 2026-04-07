@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronRight, Loader2, Plus, Trash2 } from "lucide-react";
+import { KpiHistoryDialog } from "../components/kpi/KpiHistoryDialog";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/AuthContext";
 import { useConfirmAction } from "../hooks/ConfirmContext";
@@ -26,6 +27,7 @@ import {
 import { SidebarPageLayout } from "../components/layout/SidebarPageLayout";
 
 interface GoalUsage {
+  goal_kpi_id: string;
   goal_id: string;
   goal_title: string;
   project_name: string;
@@ -87,6 +89,7 @@ export function KpiManagePage() {
       if (!goalInfo) continue;
       const arr = usageByDef.get(j.kpi_definition_id) ?? [];
       arr.push({
+        goal_kpi_id: j.id,
         goal_id: j.goal_id,
         goal_title: goalInfo.title,
         project_name: goalInfo.project_name,
@@ -400,6 +403,7 @@ export function KpiManagePage() {
                                   <TableHead className="h-8 text-[11px] font-semibold text-right">Поточне</TableHead>
                                   <TableHead className="h-8 text-[11px] font-semibold text-right">Ціль</TableHead>
                                   <TableHead className="h-8 text-[11px] font-semibold text-right">Прогрес</TableHead>
+                                  <TableHead className="h-8 text-[11px] font-semibold text-center">Історія</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -442,6 +446,19 @@ export function KpiManagePage() {
                                             {pct}%
                                           </span>
                                         </div>
+                                      </TableCell>
+                                      <TableCell className="text-center">
+                                        <KpiHistoryDialog
+                                          kpi={{
+                                            id: g.goal_kpi_id,
+                                            kpi_definition_id: kpi.id,
+                                            name: kpi.name,
+                                            current: g.current_value,
+                                            target: g.target_value,
+                                            unit: kpi.unit,
+                                            color: kpi.color ?? null,
+                                          }}
+                                        />
                                       </TableCell>
                                     </TableRow>
                                   );

@@ -34,7 +34,7 @@ import type { Goal, KPI, Project, Team } from "../../types";
 interface KPIPanelProps {
   proj: Project;
   teams: Team[];
-  onUpdateKPI: (gid: string, kid: string, fn: (k: KPI) => KPI) => void;
+  onUpdateKPI: (gid: string, kid: string, fn: (k: KPI) => KPI, comment?: string) => void;
 }
 
 const kpiCardToneClass =
