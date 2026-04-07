@@ -1,6 +1,7 @@
+import { useCallback, useEffect } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { FolderOpen, Loader2 } from "lucide-react";
 import { Header, Nav, ProjectBar } from "../components/layout";
-import { TabsContent } from "../components/layout/Nav";
 import { Dashboard } from "../components/dashboard/Dashboard";
 import { Goals } from "../components/goals/Goals";
 import { KPIPanel } from "../components/kpi/KPIPanel";
@@ -9,15 +10,38 @@ import { Button } from "../components/ui/button";
 import { useProject } from "../hooks/useProject";
 import { useAuth } from "../hooks/AuthContext";
 import { cn } from "@/lib/utils";
+import type { TabKey } from "../types";
+
+const VALID_TABS = new Set<string>(["dashboard", "goals", "kpi", "gantt"]);
+const TAB_ROUTE_TO_KEY: Record<string, TabKey> = {
+  dashboard: "dash",
+  goals: "goals",
+  kpi: "kpi",
+  gantt: "gantt",
+};
+const TAB_KEY_TO_ROUTE: Record<TabKey, string> = {
+  dash: "dashboard",
+  goals: "goals",
+  kpi: "kpi",
+  gantt: "gantt",
+};
 
 export function DashboardLayout() {
   const { isAdmin } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { projectId: urlProjectId, tab: urlTab } = useParams<{
+    projectId?: string;
+    tab?: string;
+  }>();
+
+  // Derive tab from URL
+  const tabRoute = urlTab && VALID_TABS.has(urlTab) ? urlTab : null;
+  const tab: TabKey = tabRoute ? TAB_ROUTE_TO_KEY[tabRoute] : "dash";
+
   const {
     projects,
     proj,
-    activeProjectId,
-    tab,
-    setTab,
     openGoalIds,
     setOpenGoalIds,
     expandedTasks,
@@ -31,7 +55,6 @@ export function DashboardLayout() {
     toggleGanttGoal,
     addProject,
     deleteProject,
-    switchProject,
     updateProjectSettings,
     addGoal,
     removeGoal,
@@ -48,7 +71,54 @@ export function DashboardLayout() {
     updateLink,
     kpiDefinitions,
     loading,
-  } = useProject();
+  } = useProject(urlProjectId ?? "");
+
+  // Redirect logic: fix URL when projectId or tab is missing/invalid
+  useEffect(() => {
+    if (loading || projects.length === 0) return;
+
+    const validProject = projects.find((p) => p.id === urlProjectId);
+    const firstProjectId = projects[0].id;
+
+    if (!urlProjectId || !validProject) {
+      // No project in URL or invalid project → redirect to first project's dashboard
+      navigate(`/${firstProjectId}/dashboard`, { replace: true });
+      return;
+    }
+
+    if (!tabRoute) {
+      // Project is valid but no tab segment → redirect to dashboard
+      navigate(`/${urlProjectId}/dashboard`, { replace: true });
+    }
+  }, [loading, projects, urlProjectId, tabRoute, navigate]);
+
+  const handleTabChange = useCallback(
+    (t: TabKey) => {
+      const pid = urlProjectId || projects[0]?.id;
+      if (!pid) return;
+      navigate(`/${pid}/${TAB_KEY_TO_ROUTE[t]}${location.search}`);
+    },
+    [urlProjectId, projects, navigate, location.search],
+  );
+
+  const handleSwitchProject = useCallback(
+    (id: string) => {
+      const currentTab = tabRoute ?? "dashboard";
+      navigate(`/${id}/${currentTab}`);
+    },
+    [navigate, tabRoute],
+  );
+
+  const handleAddProject = useCallback(async () => {
+    const newId = await addProject();
+    if (newId) navigate(`/${newId}/goals`);
+  }, [addProject, navigate]);
+
+  const handleDeleteProject = useCallback(async () => {
+    if (!proj.id) return;
+    const nextId = await deleteProject(proj.id);
+    if (nextId) navigate(`/${nextId}/dashboard`, { replace: true });
+  }, [proj.id, deleteProject, navigate]);
 
   if (loading) {
     return (
@@ -74,68 +144,66 @@ export function DashboardLayout() {
 
       <ProjectBar
         projects={projects}
-        activeProjectId={activeProjectId}
-        onSwitch={switchProject}
+        activeProjectId={urlProjectId ?? ""}
+        onSwitch={handleSwitchProject}
         onSaveProject={updateProjectSettings}
-        onDelete={() => proj.id && deleteProject(proj.id)}
-        onAddProject={addProject}
+        onDelete={handleDeleteProject}
+        onAddProject={handleAddProject}
         isAdmin={isAdmin}
       />
 
       {hasProjects ? (
-        <>
-          <Nav tab={tab} onTabChange={setTab}>
-            <TabsContent value="dash">
-              <Dashboard proj={proj} stats={stats} teams={teams} />
-            </TabsContent>
+        <Nav tab={tab} onTabChange={handleTabChange} projectId={urlProjectId ?? ""}>
+          {tab === "dash" && (
+            <Dashboard proj={proj} stats={stats} teams={teams} />
+          )}
 
-            <TabsContent value="goals">
-              <Goals
-                proj={proj}
-                kpiDefinitions={kpiDefinitions}
-                teams={teams}
-                teamUsers={teamUsers}
-                isAdmin={isAdmin}
-                openGoalIds={openGoalIds}
-                onOpenGoalIdsChange={setOpenGoalIds}
-                expandedTasks={expandedTasks}
-                onAddGoal={addGoal}
-                onRemoveGoal={removeGoal}
-                onUpdateGoalField={updateGoalField}
-                onChangeGoalDates={changeGoalDates}
-                onAddKPI={addKPI}
-                onRemoveKPI={removeKPI}
-                onUpdateKPI={updateKPI}
-                onAddTask={addTask}
-                onRemoveTask={removeTask}
-                onUpdateTask={updateTask}
-                onToggleTask={toggleTask}
-                onAddLink={addLink}
-                onRemoveLink={removeLink}
-                onUpdateLink={updateLink}
-              />
-            </TabsContent>
+          {tab === "goals" && (
+            <Goals
+              proj={proj}
+              kpiDefinitions={kpiDefinitions}
+              teams={teams}
+              teamUsers={teamUsers}
+              isAdmin={isAdmin}
+              openGoalIds={openGoalIds}
+              onOpenGoalIdsChange={setOpenGoalIds}
+              expandedTasks={expandedTasks}
+              onAddGoal={addGoal}
+              onRemoveGoal={removeGoal}
+              onUpdateGoalField={updateGoalField}
+              onChangeGoalDates={changeGoalDates}
+              onAddKPI={addKPI}
+              onRemoveKPI={removeKPI}
+              onUpdateKPI={updateKPI}
+              onAddTask={addTask}
+              onRemoveTask={removeTask}
+              onUpdateTask={updateTask}
+              onToggleTask={toggleTask}
+              onAddLink={addLink}
+              onRemoveLink={removeLink}
+              onUpdateLink={updateLink}
+            />
+          )}
 
-            <TabsContent value="kpi" className="w-full min-w-0">
-              <KPIPanel proj={proj} teams={teams} onUpdateKPI={updateKPI} />
-            </TabsContent>
+          {tab === "kpi" && (
+            <KPIPanel proj={proj} teams={teams} onUpdateKPI={updateKPI} />
+          )}
 
-            <TabsContent value="gantt">
-              <Gantt
-                proj={proj}
-                teams={teams}
-                ganttRange={ganttRange}
-                ganttMonths={ganttMonths}
-                ganttExpanded={ganttExpanded}
-                onToggleGoal={toggleGanttGoal}
-                onChangeGoalDates={changeGoalDates}
-                onChangeTaskDates={(gid, tid, field, val) =>
-                  updateTask(gid, tid, (t) => ({ ...t, [field]: val }))
-                }
-              />
-            </TabsContent>
-          </Nav>
-        </>
+          {tab === "gantt" && (
+            <Gantt
+              proj={proj}
+              teams={teams}
+              ganttRange={ganttRange}
+              ganttMonths={ganttMonths}
+              ganttExpanded={ganttExpanded}
+              onToggleGoal={toggleGanttGoal}
+              onChangeGoalDates={changeGoalDates}
+              onChangeTaskDates={(gid, tid, field, val) =>
+                updateTask(gid, tid, (t) => ({ ...t, [field]: val }))
+              }
+            />
+          )}
+        </Nav>
       ) : (
         <div
           className={cn(
@@ -153,7 +221,7 @@ export function DashboardLayout() {
               : "Тут відображаються лише проєкти, де вам призначені задачі. Зверніться до адміністратора, якщо потрібен доступ."}
           </div>
           {isAdmin && (
-            <Button type="button" onClick={addProject}>
+            <Button type="button" onClick={handleAddProject}>
               ＋ Створити проект
             </Button>
           )}
@@ -163,7 +231,7 @@ export function DashboardLayout() {
       <div
         className={cn("text-center py-5 pb-7 text-[10px]", "text-muted-foreground")}
       >
-        Digital Marketing Dashboard v3.0
+        Performance Dashboard v3.0
       </div>
     </div>
   );

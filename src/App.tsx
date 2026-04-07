@@ -43,6 +43,23 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      {/* Project-scoped dashboard routes */}
+      <Route
+        path="/:projectId/:tab"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/:projectId"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/"
         element={

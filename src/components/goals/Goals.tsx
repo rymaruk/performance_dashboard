@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "../ui/button";
 import {
   Empty,
@@ -12,6 +13,9 @@ import { FilterSelect } from "../ui/FilterSelect";
 import { Accordion } from "../ui/accordion";
 import { GoalItem } from "./GoalItem";
 import { PRIO, STAT } from "../../constants";
+import { goalPeriodOverlapsFilter, today, addDays } from "../../utils/date";
+import { DateRangePicker } from "../ui/DateRangePicker";
+import { Label } from "../ui/label";
 import { FilterX, Plus, X, Target } from "lucide-react";
 import type { Goal, KPI, KpiDefinition, Task, Project, Team, UserProfile } from "../../types";
 
@@ -64,10 +68,42 @@ export function Goals({
   onRemoveLink,
   onUpdateLink,
 }: GoalsProps) {
-  const [filterTeam, setFilterTeam] = useState<string | null>(null);
-  const [filterPrio, setFilterPrio] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<string | null>(null);
-  const [filterUser, setFilterUser] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterTeam = searchParams.get("team");
+  const filterPrio = searchParams.get("prio");
+  const filterStatus = searchParams.get("status");
+  const filterUser = searchParams.get("user");
+  const filterPeriodFrom = searchParams.get("from");
+  const filterPeriodTo = searchParams.get("to");
+
+  const setFilter = useCallback(
+    (key: string, value: string | null) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        return next;
+      }, { replace: true });
+    },
+    [setSearchParams],
+  );
+  const setFilters = useCallback(
+    (entries: Record<string, string | null>) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        for (const [k, v] of Object.entries(entries)) {
+          if (v) next.set(k, v);
+          else next.delete(k);
+        }
+        return next;
+      }, { replace: true });
+    },
+    [setSearchParams],
+  );
+  const setFilterTeam = (v: string | null) => setFilter("team", v);
+  const setFilterPrio = (v: string | null) => setFilter("prio", v);
+  const setFilterStatus = (v: string | null) => setFilter("status", v);
+  const setFilterUser = (v: string | null) => setFilter("user", v);
 
   const teamOptions = useMemo(
     () => teams.map((t) => `${t.name}::${t.id}`),
@@ -107,6 +143,7 @@ export function Goals({
       if (teamFilterId && g.team_id !== teamFilterId) return false;
       if (filterPrio && g.priority !== filterPrio) return false;
       if (filterStatus && g.status !== filterStatus) return false;
+      if (!goalPeriodOverlapsFilter(g.startDate, g.endDate, filterPeriodFrom, filterPeriodTo)) return false;
 
       if (userFilterId) {
         const matchingTasks = g.tasks.filter((t) => t.user_id === userFilterId);
@@ -117,9 +154,9 @@ export function Goals({
       return true;
     });
     return { filtered, filteredTaskIdsByGoal };
-  }, [proj.goals, teamFilterId, filterPrio, filterStatus, userFilterId]);
+  }, [proj.goals, teamFilterId, filterPrio, filterStatus, userFilterId, filterPeriodFrom, filterPeriodTo]);
 
-  const hasFilters = filterTeam || filterPrio || filterStatus || filterUser;
+  const hasFilters = filterTeam || filterPrio || filterStatus || filterUser || filterPeriodFrom || filterPeriodTo;
   const noGoals = proj.goals.length === 0;
   const noMatches = filtered.length === 0;
 
@@ -159,11 +196,23 @@ export function Goals({
               return sep >= 0 ? opt.slice(0, sep) : opt;
             }}
           />
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            <Label className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap">
+              Період цілі:
+            </Label>
+            <DateRangePicker
+              startDate={filterPeriodFrom ?? today()}
+              endDate={filterPeriodTo ?? addDays(today(), 90)}
+              onChangeRange={(from, to) => setFilters({ from, to })}
+              size="sm"
+              placeholder={!filterPeriodFrom && !filterPeriodTo ? "Обрати період" : undefined}
+            />
+          </div>
           {hasFilters && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => { setFilterTeam(null); setFilterPrio(null); setFilterStatus(null); setFilterUser(null); }}
+              onClick={() => setSearchParams({}, { replace: true })}
               className="text-destructive hover:text-destructive/80 h-7"
             >
               <X className="size-3" /> Скинути всі

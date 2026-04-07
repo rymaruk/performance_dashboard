@@ -11,8 +11,10 @@ import { medDate, shortDate } from "../../utils/date";
 interface DateRangePickerProps {
   startDate: string;
   endDate: string;
-  onChangeStart: (v: string) => void;
-  onChangeEnd: (v: string) => void;
+  onChangeStart?: (v: string) => void;
+  onChangeEnd?: (v: string) => void;
+  /** Fires once with both values when a complete range is selected. Preferred over onChangeStart/onChangeEnd for atomic updates. */
+  onChangeRange?: (from: string, to: string) => void;
   minDate?: string;
   maxDate?: string;
   size?: "sm" | "md";
@@ -30,6 +32,7 @@ export function DateRangePicker({
   endDate,
   onChangeStart,
   onChangeEnd,
+  onChangeRange,
   minDate,
   maxDate,
   size = "md",
@@ -64,8 +67,14 @@ export function DateRangePicker({
       const from = day < start ? day : start;
       const to = day < start ? start : day;
       setDraft(null);
-      onChangeStart(toStr(from));
-      onChangeEnd(toStr(to));
+      const fromStr = toStr(from);
+      const toStr_ = toStr(to);
+      if (onChangeRange) {
+        onChangeRange(fromStr, toStr_);
+      } else {
+        onChangeStart?.(fromStr);
+        onChangeEnd?.(toStr_);
+      }
     }
   };
 

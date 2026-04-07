@@ -10,7 +10,6 @@ import type {
   KpiDefinition,
   Task,
   Link,
-  TabKey,
   ProjectStats,
   GanttRange,
   GanttMonth,
@@ -96,11 +95,9 @@ function clampTasks(tasks: Task[], gs: string, ge: string): Task[] {
 
 /* ── main hook ── */
 
-export function useProject() {
+export function useProject(activeProjectId: string) {
   const { isAdmin, userTeamId, profile } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [activeProjectId, setActive] = useState<string>("");
-  const [tab, setTab] = useState<TabKey>("dash");
   const [openGoalIds, setOpenGoalIds] = useState<string[]>([]);
   const [expandedTasks, setExpandedTasks] = useState<Record<string, boolean>>({});
   const [ganttExpanded, setGanttExpanded] = useState<Record<string, boolean>>({});
@@ -149,7 +146,6 @@ export function useProject() {
 
     if (!projRows || projRows.length === 0) {
       setProjects([]);
-      setActive("");
       setLoading(false);
       return;
     }
@@ -259,11 +255,8 @@ export function useProject() {
     }
 
     setProjects(loaded);
-    if (!activeProjectId || !loaded.find((p) => p.id === activeProjectId)) {
-      setActive(loaded[0]?.id ?? "");
-    }
     setLoading(false);
-  }, [isAdmin, userTeamId, profile?.id, activeProjectId, loadTeamUsers]);
+  }, [isAdmin, userTeamId, profile?.id, loadTeamUsers]);
 
   useEffect(() => {
     loadProjects();
@@ -377,15 +370,15 @@ export function useProject() {
   }, [ganttRange]);
 
   /* ─── Project actions ─── */
-  const addProject = async () => {
-    if (!isAdmin) return;
+  const addProject = async (): Promise<string | null> => {
+    if (!isAdmin) return null;
     const projColor = ACCENT_COLORS[projects.length % ACCENT_COLORS.length].key;
     const { data, error } = await supabase
       .from("projects")
       .insert({ name: "Новий проект", description: "", color: projColor })
       .select()
       .single();
-    if (error || !data) return;
+    if (error || !data) return null;
     const np: Project = {
       id: data.id,
       name: data.name,
@@ -395,22 +388,16 @@ export function useProject() {
       createdAt: new Date(data.created_at).getTime(),
     };
     setProjects((ps) => [...ps, np]);
-    setActive(np.id);
-    setTab("goals");
+    return np.id;
   };
 
-  const deleteProject = async (id: string) => {
-    if (!isAdmin) return;
-    if (projects.length <= 1) return;
+  const deleteProject = async (id: string): Promise<string | null> => {
+    if (!isAdmin) return null;
+    if (projects.length <= 1) return null;
     await supabase.from("projects").delete().eq("id", id);
     const nx = projects.find((p) => p.id !== id)!;
     setProjects((ps) => ps.filter((p) => p.id !== id));
-    if (activeProjectId === id) setActive(nx.id);
-  };
-
-  const switchProject = (id: string) => {
-    setActive(id);
-    setTab("dash");
+    return nx.id;
   };
 
   /* ─── Project field updaters (dialog saves name + desc + color in one request) ─── */
@@ -708,9 +695,6 @@ export function useProject() {
   return {
     projects,
     proj,
-    activeProjectId,
-    tab,
-    setTab,
     openGoalIds,
     setOpenGoalIds,
     expandedTasks,
@@ -725,7 +709,6 @@ export function useProject() {
     toggleGanttGoal,
     addProject,
     deleteProject,
-    switchProject,
     updateProjectSettings,
     addGoal,
     removeGoal,

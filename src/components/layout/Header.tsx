@@ -33,7 +33,7 @@ export function Header() {
     <header className="border-b bg-card px-6 py-4 flex justify-between items-center flex-wrap gap-2">
       <div>
         <h1 className="text-lg font-bold text-foreground">
-          Digital Marketing — Project Dashboard
+          Performance Dashboard - Digital Marketing
         </h1>
         <p className="text-xs text-muted-foreground">
           Цілі · KPI · Задачі · Gantt · Проекти

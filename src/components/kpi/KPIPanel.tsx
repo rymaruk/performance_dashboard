@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Editable } from "../ui";
 import { ProgressBar } from "../ui/progress-bar";
@@ -38,9 +39,36 @@ const kpiCardToneClass =
   "*:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs dark:*:data-[slot=card]:bg-card";
 
 export function KPIPanel({ proj, teams, onUpdateKPI }: KPIPanelProps) {
-  const [filterTeam, setFilterTeam] = useState<string | null>(null);
-  const [filterPeriodFrom, setFilterPeriodFrom] = useState<string | null>(null);
-  const [filterPeriodTo, setFilterPeriodTo] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterTeam = searchParams.get("team");
+  const filterPeriodFrom = searchParams.get("from");
+  const filterPeriodTo = searchParams.get("to");
+
+  const setFilter = useCallback(
+    (key: string, value: string | null) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        return next;
+      }, { replace: true });
+    },
+    [setSearchParams],
+  );
+  const setFilters = useCallback(
+    (entries: Record<string, string | null>) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        for (const [k, v] of Object.entries(entries)) {
+          if (v) next.set(k, v);
+          else next.delete(k);
+        }
+        return next;
+      }, { replace: true });
+    },
+    [setSearchParams],
+  );
+  const setFilterTeam = (v: string | null) => setFilter("team", v);
 
   const teamName = (teamId: string | null | undefined) =>
     teams.find((t) => t.id === teamId)?.name ?? "Без команди";
@@ -101,8 +129,7 @@ export function KPIPanel({ proj, teams, onUpdateKPI }: KPIPanelProps) {
               <DateRangePicker
                 startDate={filterPeriodFrom ?? today()}
                 endDate={filterPeriodTo ?? addDays(today(), 90)}
-                onChangeStart={setFilterPeriodFrom}
-                onChangeEnd={setFilterPeriodTo}
+                onChangeRange={(from, to) => setFilters({ from, to })}
                 size="sm"
                 placeholder={!filterPeriodFrom && !filterPeriodTo ? "Обрати період" : undefined}
               />
@@ -111,11 +138,7 @@ export function KPIPanel({ proj, teams, onUpdateKPI }: KPIPanelProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  setFilterTeam(null);
-                  setFilterPeriodFrom(null);
-                  setFilterPeriodTo(null);
-                }}
+                onClick={() => setSearchParams({}, { replace: true })}
                 className="h-7 text-destructive hover:text-destructive/80"
               >
                 <X className="size-3" /> Скинути всі
