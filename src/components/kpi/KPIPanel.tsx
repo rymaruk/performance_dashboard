@@ -226,7 +226,7 @@ export function KPIPanel({ proj, teams, onUpdateKPI }: KPIPanelProps) {
                             <CardDescription>{k.name}</CardDescription>
                             <CardTitle
                               className={cn(
-                                "text-2xl font-semibold tabular-nums @[250px]/card:text-3xl",
+                                "min-w-0 text-2xl font-semibold tabular-nums @[250px]/card:text-3xl",
                                 pct >= 100 ? "text-success" : kac.text,
                               )}
                             >
@@ -239,7 +239,9 @@ export function KPIPanel({ proj, teams, onUpdateKPI }: KPIPanelProps) {
                                   }))
                                 }
                                 type="number"
-                                className="tabular-nums"
+                                plain
+                                numericOnly
+                                className="block w-full min-w-0 text-inherit"
                               />
                             </CardTitle>
                             <CardAction>

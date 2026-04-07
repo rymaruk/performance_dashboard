@@ -94,20 +94,21 @@ export function TaskItem({
           )}
         />
 
-        <Field className="flex-1 min-w-[100px]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex-1 min-w-[100px] flex items-center">
           <Input
             value={t.title}
             onChange={(e) =>
               onUpdate((tt) => ({ ...tt, title: e.target.value }))
             }
             placeholder="Назва задачі"
+            onClick={(e) => e.stopPropagation()}
             className={cn(
-              "h-auto border-none bg-transparent shadow-none px-0 py-0 text-xs font-semibold",
+              "h-auto min-h-7 w-full border-none bg-transparent shadow-none px-0 py-0 text-xs font-semibold",
               "focus-visible:ring-0 focus-visible:border-none",
               t.status === "Done" && "line-through text-muted-foreground",
             )}
           />
-        </Field>
+        </div>
 
         <div onClick={(e) => e.stopPropagation()}>
           {isAdmin ? (

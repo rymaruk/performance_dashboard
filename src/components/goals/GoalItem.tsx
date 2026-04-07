@@ -120,7 +120,8 @@ export function GoalItem({
     >
       <AccordionTrigger
         className={cn(
-          "px-4 py-3 flex flex-wrap gap-2 items-center hover:no-underline",
+          "px-4 py-3 flex flex-wrap gap-2 items-center hover:no-underline cursor-pointer",
+          "text-left w-full [&>svg]:shrink-0",
           ac.bgLight,
         )}
       >
@@ -132,7 +133,7 @@ export function GoalItem({
           />
         </div>
 
-        <div className="flex-1 min-w-[160px]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex-1 min-w-[160px] min-h-8 flex items-center">
           <Editable
             value={g.title}
             onChange={(v) => onUpdateField("title", String(v))}
