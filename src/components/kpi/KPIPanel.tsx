@@ -14,7 +14,7 @@ import {
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { FilterSelect } from "../ui/FilterSelect";
-import { Input } from "../ui/input";
+import { DateRangePicker } from "../ui/DateRangePicker";
 import { Label } from "../ui/label";
 import {
   Empty,
@@ -23,7 +23,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "../ui/empty";
-import { goalPeriodOverlapsFilter, medDate } from "../../utils/date";
+import { goalPeriodOverlapsFilter, medDate, today, addDays } from "../../utils/date";
 import { getAccentDef } from "../../constants";
 import { BarChart3, FilterX, TrendingDown, TrendingUp, X } from "lucide-react";
 import type { Goal, KPI, Project, Team } from "../../types";
@@ -98,24 +98,13 @@ export function KPIPanel({ proj, teams, onUpdateKPI }: KPIPanelProps) {
               <Label className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap">
                 Період цілі (перетин):
               </Label>
-              <Input
-                type="date"
-                value={filterPeriodFrom ?? ""}
-                onChange={(e) => setFilterPeriodFrom(e.target.value || null)}
-                className={cn(
-                  "h-7 w-[min(100%,9.5rem)] min-w-0 rounded-md text-[11px] font-medium sm:w-36",
-                  filterPeriodFrom ? "border-border bg-accent text-foreground" : "border-input",
-                )}
-              />
-              <span className="text-[11px] text-muted-foreground">—</span>
-              <Input
-                type="date"
-                value={filterPeriodTo ?? ""}
-                onChange={(e) => setFilterPeriodTo(e.target.value || null)}
-                className={cn(
-                  "h-7 w-[min(100%,9.5rem)] min-w-0 rounded-md text-[11px] font-medium sm:w-36",
-                  filterPeriodTo ? "border-border bg-accent text-foreground" : "border-input",
-                )}
+              <DateRangePicker
+                startDate={filterPeriodFrom ?? today()}
+                endDate={filterPeriodTo ?? addDays(today(), 90)}
+                onChangeStart={setFilterPeriodFrom}
+                onChangeEnd={setFilterPeriodTo}
+                size="sm"
+                placeholder={!filterPeriodFrom && !filterPeriodTo ? "Обрати період" : undefined}
               />
             </div>
             {hasFilters && (

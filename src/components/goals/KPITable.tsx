@@ -37,6 +37,8 @@ interface KPITableProps {
   goalColor?: string | null;
   kpis: KPI[];
   kpiDefinitions: KpiDefinition[];
+  /** When true, hides the section title row; use when the goal header is shown beside tasks (e.g. GoalItem two-column layout). */
+  embedded?: boolean;
   onAdd: (kpiDefId: string) => void;
   onRemove: (kid: string) => void;
   onUpdate: (kid: string, fn: (k: KPI) => KPI) => void;
@@ -46,6 +48,7 @@ export function KPITable({
   goalColor,
   kpis,
   kpiDefinitions,
+  embedded = false,
   onAdd,
   onRemove,
   onUpdate,
@@ -62,47 +65,76 @@ export function KPITable({
     [kpiDefinitions, attachedDefIds],
   );
 
+  const addKpiSelect =
+    available.length > 0 ? (
+      <Select onValueChange={(v) => onAdd(v)}>
+        <SelectTrigger
+          size="sm"
+          className="h-7 gap-1 bg-accent text-[11px] font-semibold"
+        >
+          <Plus className="size-3" />
+          <SelectValue placeholder="Додати KPI…" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {available.map((d) => (
+              <SelectItem key={d.id} value={d.id}>
+                {d.name} ({d.unit})
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    ) : null;
+
+  const showEmbeddedToolbar =
+    embedded &&
+    (addKpiSelect != null ||
+      kpiDefinitions.length === 0 ||
+      (kpis.length === 0 && available.length === 0));
+
   return (
-    <div className="mb-4">
-      <Item size="sm" className="mb-2 align-middle">
-        <ItemMedia variant="icon">
-          <BarChart3 />
-        </ItemMedia>
-        <ItemContent>
-          <ItemTitle>KPI показники</ItemTitle>
-          {kpiDefinitions.length === 0 ? (
-            <ItemDescription>Спочатку створіть KPI показники</ItemDescription>
-          ) : available.length === 0 ? (
-            <ItemDescription>Усі KPI вже додані</ItemDescription>
-          ) : null}
-        </ItemContent>
-        <ItemActions>
-          {available.length > 0 && (
-            <Select onValueChange={(v) => onAdd(v)}>
-              <SelectTrigger
-                size="sm"
-                className="h-7 gap-1 bg-accent text-[11px] font-semibold"
-              >
-                <Plus className="size-3" />
-                <SelectValue placeholder="Додати KPI…" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {available.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>
-                      {d.name} ({d.unit})
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          )}
-        </ItemActions>
-      </Item>
+    <div className={cn(!embedded && "mb-4")}>
+      {embedded ? (
+        showEmbeddedToolbar ? (
+          <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
+            {kpiDefinitions.length === 0 ? (
+              <span className="text-[11px] text-muted-foreground">
+                Спочатку створіть KPI показники
+              </span>
+            ) : available.length === 0 && kpis.length === 0 ? (
+              <span className="text-[11px] text-muted-foreground">
+                Усі KPI вже додані
+              </span>
+            ) : null}
+            {addKpiSelect}
+          </div>
+        ) : null
+      ) : (
+        <Item size="sm" className="mb-2 align-middle">
+          <ItemMedia variant="icon">
+            <BarChart3 />
+          </ItemMedia>
+          <ItemContent>
+            <ItemTitle>KPI показники</ItemTitle>
+            {kpiDefinitions.length === 0 ? (
+              <ItemDescription>Спочатку створіть KPI показники</ItemDescription>
+            ) : available.length === 0 ? (
+              <ItemDescription>Усі KPI вже додані</ItemDescription>
+            ) : null}
+          </ItemContent>
+          <ItemActions>{addKpiSelect}</ItemActions>
+        </Item>
+      )}
 
       {kpis.length > 0 && (
         <div
-          className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(min(100%,max(12rem,calc((100%-1rem)/3))),1fr))]"
+          className={cn(
+            "grid gap-2",
+            embedded
+              ? "grid-cols-1 sm:grid-cols-2"
+              : "[grid-template-columns:repeat(auto-fit,minmax(min(100%,max(12rem,calc((100%-1rem)/3))),1fr))]",
+          )}
         >
           {kpis.map((k) => {
           const kac = getAccentDef(k.color ?? goalColor);

@@ -1,10 +1,12 @@
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
-import { createPortal } from "react-dom";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
-import { medDate, shortDate } from "../../utils/date";
+import { useMemo, useState } from "react";
+import { uk } from "date-fns/locale";
+import { CalendarIcon } from "lucide-react";
+import type { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
+import { Calendar } from "./calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "./popover";
+import { medDate, shortDate } from "../../utils/date";
 
 interface DateRangePickerProps {
   startDate: string;
@@ -15,11 +17,13 @@ interface DateRangePickerProps {
   maxDate?: string;
   size?: "sm" | "md";
   variant?: "default" | "gantt";
+  /** When set, show this text on the trigger button instead of dates until the picker is used. */
+  placeholder?: string;
 }
 
 const toDate = (s: string) => new Date(s + "T00:00:00");
-const toStr = (d: Date) => d.toISOString().slice(0, 10);
-const TOOLTIP_GAP = 6;
+const toStr = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 export function DateRangePicker({
   startDate,
@@ -30,137 +34,101 @@ export function DateRangePicker({
   maxDate,
   size = "md",
   variant = "default",
+  placeholder,
 }: DateRangePickerProps) {
-  const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
-
-  const reposition = useCallback(() => {
-    if (!triggerRef.current || !tooltipRef.current) return;
-    const tr = triggerRef.current.getBoundingClientRect();
-    const tt = tooltipRef.current.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-
-    let top = tr.bottom + TOOLTIP_GAP + window.scrollY;
-    let left = tr.left + window.scrollX;
-
-    if (tr.bottom + TOOLTIP_GAP + tt.height > vh) {
-      top = tr.top - tt.height - TOOLTIP_GAP + window.scrollY;
-    }
-    if (left + tt.width > vw + window.scrollX - 8) {
-      left = vw + window.scrollX - tt.width - 8;
-    }
-    if (left < window.scrollX + 8) {
-      left = window.scrollX + 8;
-    }
-    setPos({ top, left });
-  }, []);
-
-  useLayoutEffect(() => {
-    if (open) reposition();
-  }, [open, startDate, endDate, reposition]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = () => reposition();
-    window.addEventListener("scroll", handler, true);
-    window.addEventListener("resize", handler);
-    return () => {
-      window.removeEventListener("scroll", handler, true);
-      window.removeEventListener("resize", handler);
-    };
-  }, [open, reposition]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        triggerRef.current && !triggerRef.current.contains(target) &&
-        tooltipRef.current && !tooltipRef.current.contains(target)
-      ) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
   const isSm = size === "sm";
   const isGantt = variant === "gantt";
 
+  /**
+   * Internal range state that drives the calendar.
+   * - null  → show the committed (parent) range; first click starts a new selection.
+   * - {from}  → user picked start; waiting for end click.
+   * - {from,to} → never stored here; committed to parent immediately.
+   */
+  const [draft, setDraft] = useState<DateRange | null>(null);
+
+  const committed = useMemo<DateRange>(
+    () => ({ from: toDate(startDate), to: toDate(endDate) }),
+    [startDate, endDate],
+  );
+
+  const displayed = draft ?? committed;
+
+  const handleDayClick = (day: Date) => {
+    if (!draft) {
+      // First click — start a brand-new range (only "from").
+      setDraft({ from: day, to: undefined });
+    } else {
+      // Second click — complete the range.
+      const start = draft.from!;
+      const from = day < start ? day : start;
+      const to = day < start ? start : day;
+      setDraft(null);
+      onChangeStart(toStr(from));
+      onChangeEnd(toStr(to));
+    }
+  };
+
+  const disabledMatcher = useMemo(() => {
+    const matchers: Array<{ before?: Date; after?: Date }> = [];
+    if (minDate) matchers.push({ before: toDate(minDate) });
+    if (maxDate) matchers.push({ after: toDate(maxDate) });
+    return matchers.length > 0 ? matchers : undefined;
+  }, [minDate, maxDate]);
+
   return (
-    <>
-      <Button
-        ref={triggerRef}
-        variant={isGantt ? "ghost" : "outline"}
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((o) => !o);
-        }}
-        className={cn(
-          "inline-flex items-center whitespace-nowrap h-auto",
-          isGantt
-            ? "gap-0.5 p-0 text-[8px] font-bold text-primary-foreground bg-transparent border-none leading-none opacity-90 hover:opacity-100 hover:bg-transparent [text-shadow:0_1px_2px_rgba(0,0,0,0.3)]"
-            : cn(
-                "font-semibold",
-                isSm ? "gap-0.5 px-2 py-0.5 text-[10px]" : "gap-1 px-2.5 py-1 text-[11px]",
-                open && "border-ring ring-2 ring-ring/50",
-              ),
-        )}
-      >
-        {!isGantt && <span className={isSm ? "text-[9px]" : "text-[10px]"}>📅</span>}
-        <span>{isGantt ? shortDate(startDate) : medDate(startDate)}</span>
-        <span className={isGantt ? "text-primary-foreground/60" : "text-muted-foreground"}>
-          {isGantt ? "–" : "→"}
-        </span>
-        <span>{isGantt ? shortDate(endDate) : medDate(endDate)}</span>
-      </Button>
-
-      {open &&
-        createPortal(
-          <div
-            ref={tooltipRef}
-            onClick={(e) => e.stopPropagation()}
-            className="absolute z-[10000] bg-popover rounded-xl shadow-2xl border border-border p-3.5 flex gap-4 items-start"
-            style={{ top: pos.top, left: pos.left }}
-          >
-            <div>
-              <div className="text-[10px] font-bold text-muted-foreground mb-1.5 uppercase tracking-wide">
-                Початок
-              </div>
-              <DatePicker
-                selected={toDate(startDate)}
-                onChange={(date: Date | null) => {
-                  if (date) onChangeStart(toStr(date));
-                }}
-                minDate={minDate ? toDate(minDate) : undefined}
-                maxDate={toDate(endDate)}
-                inline
-                calendarClassName="dp-tooltip-cal"
-              />
-            </div>
-
-            <div>
-              <div className="text-[10px] font-bold text-muted-foreground mb-1.5 uppercase tracking-wide">
-                Кінець
-              </div>
-              <DatePicker
-                selected={toDate(endDate)}
-                onChange={(date: Date | null) => {
-                  if (date) onChangeEnd(toStr(date));
-                }}
-                minDate={toDate(startDate)}
-                maxDate={maxDate ? toDate(maxDate) : undefined}
-                inline
-                calendarClassName="dp-tooltip-cal"
-              />
-            </div>
-          </div>,
-          document.body,
-        )}
-    </>
+    <Popover
+      onOpenChange={(open) => {
+        // If popover closes while a draft is in progress, discard it.
+        if (!open) setDraft(null);
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          variant={isGantt ? "ghost" : "outline"}
+          className={cn(
+            "inline-flex items-center whitespace-nowrap h-auto",
+            isGantt
+              ? "gap-0.5 p-0 text-[8px] font-bold text-primary-foreground bg-transparent border-none leading-none opacity-90 hover:opacity-100 hover:bg-transparent [text-shadow:0_1px_2px_rgba(0,0,0,0.3)]"
+              : cn(
+                  "font-semibold",
+                  isSm
+                    ? "gap-0.5 px-2 py-0.5 text-[10px]"
+                    : "gap-1 px-2.5 py-1 text-[11px]",
+                ),
+          )}
+        >
+          {!isGantt && <CalendarIcon className={isSm ? "size-3" : "size-3.5"} />}
+          {placeholder ? (
+            <span className="text-muted-foreground">{placeholder}</span>
+          ) : (
+            <>
+              <span>{isGantt ? shortDate(startDate) : medDate(startDate)}</span>
+              <span
+                className={
+                  isGantt
+                    ? "text-primary-foreground/60"
+                    : "text-muted-foreground"
+                }
+              >
+                {isGantt ? "\u2013" : "\u2192"}
+              </span>
+              <span>{isGantt ? shortDate(endDate) : medDate(endDate)}</span>
+            </>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="range"
+          defaultMonth={toDate(startDate)}
+          selected={displayed}
+          onDayClick={handleDayClick}
+          numberOfMonths={2}
+          disabled={disabledMatcher}
+          locale={uk}
+        />
+      </PopoverContent>
+    </Popover>
   );
 }

@@ -22,7 +22,7 @@ export const medDate = (s: string): string => {
 };
 
 /**
- * Чи перетинається період цілі [goalStart, goalEnd] з обраним вікном [filterFrom, filterTo] (ISO YYYY-MM-DD).
+ * Чи повністю вміщується період цілі [goalStart, goalEnd] в обране вікно [filterFrom, filterTo] (ISO YYYY-MM-DD).
  * Якщо обидві межі фільтра порожні — завжди true. Достатньо однієї межі.
  */
 export function goalPeriodOverlapsFilter(
@@ -32,7 +32,7 @@ export function goalPeriodOverlapsFilter(
   filterTo: string | null,
 ): boolean {
   if (!filterFrom && !filterTo) return true;
-  if (filterFrom && !filterTo) return goalEnd >= filterFrom;
-  if (!filterFrom && filterTo) return goalStart <= filterTo;
-  return goalStart <= filterTo! && goalEnd >= filterFrom!;
+  if (filterFrom && !filterTo) return goalStart >= filterFrom;
+  if (!filterFrom && filterTo) return goalEnd <= filterTo;
+  return goalStart >= filterFrom! && goalEnd <= filterTo!;
 }
