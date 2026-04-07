@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   Label,
@@ -84,6 +85,8 @@ interface DashboardProps {
 
 
 export function Dashboard({ proj, stats, teams }: DashboardProps) {
+  const navigate = useNavigate();
+  const { projectId } = useParams<{ projectId: string }>();
   const { profile, refreshProfile } = useAuth();
   const teamName = (teamId: string | null | undefined) =>
     teams.find((t) => t.id === teamId)?.name ?? "Без команди";
@@ -258,7 +261,11 @@ export function Dashboard({ proj, stats, teams }: DashboardProps) {
       {(markers.overdueTasks > 0 || markers.blockedGoals > 0 || markers.upcomingDeadlines > 0) && (
         <div className="flex gap-2.5 mx-4 mt-4 flex-wrap">
           {markers.overdueTasks > 0 && (
-            <Item variant="outline" className="flex-1 min-w-[140px] border-l-4 border-destructive bg-destructive/10">
+            <Item
+              variant="outline"
+              className="flex-1 min-w-[140px] border-l-4 border-destructive bg-destructive/10 cursor-pointer hover:bg-destructive/15 transition-colors"
+              onClick={() => navigate(`/${projectId}/goals?overdue=1`)}
+            >
               <ItemContent>
                 <ItemTitle className="text-lg font-extrabold text-destructive">{markers.overdueTasks}</ItemTitle>
                 <ItemDescription className="text-destructive font-semibold">Прострочені задачі</ItemDescription>

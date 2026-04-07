@@ -13,10 +13,11 @@ import { FilterSelect } from "../ui/FilterSelect";
 import { Accordion } from "../ui/accordion";
 import { GoalItem } from "./GoalItem";
 import { PRIO, STAT } from "../../constants";
+import { Badge } from "../ui/badge";
 import { goalPeriodOverlapsFilter, today, addDays } from "../../utils/date";
 import { DateRangePicker } from "../ui/DateRangePicker";
 import { Label } from "../ui/label";
-import { FilterX, Plus, X, Target } from "lucide-react";
+import { AlertTriangle, FilterX, Plus, X, Target } from "lucide-react";
 import type { Goal, KPI, KpiDefinition, Task, Project, Team, UserProfile } from "../../types";
 
 interface GoalsProps {
@@ -75,6 +76,7 @@ export function Goals({
   const filterUser = searchParams.get("user");
   const filterPeriodFrom = searchParams.get("from");
   const filterPeriodTo = searchParams.get("to");
+  const filterOverdue = searchParams.get("overdue") === "1";
 
   const setFilter = useCallback(
     (key: string, value: string | null) => {
@@ -137,6 +139,8 @@ export function Goals({
     return sep >= 0 ? filterUser.slice(sep + 2) : null;
   }, [filterUser]);
 
+  const now = useMemo(() => today(), []);
+
   const { filtered, filteredTaskIdsByGoal } = useMemo(() => {
     const filteredTaskIdsByGoal: Record<string, Set<string>> = {};
     const filtered = proj.goals.filter((g) => {
@@ -145,18 +149,34 @@ export function Goals({
       if (filterStatus && g.status !== filterStatus) return false;
       if (!goalPeriodOverlapsFilter(g.startDate, g.endDate, filterPeriodFrom, filterPeriodTo)) return false;
 
+      if (filterOverdue) {
+        const overdueTasks = g.tasks.filter((t) => t.status !== "Done" && t.endDate < now);
+        if (overdueTasks.length === 0) return false;
+        filteredTaskIdsByGoal[g.id] = new Set(overdueTasks.map((t) => t.id));
+      }
+
       if (userFilterId) {
         const matchingTasks = g.tasks.filter((t) => t.user_id === userFilterId);
         if (matchingTasks.length === 0) return false;
-        filteredTaskIdsByGoal[g.id] = new Set(matchingTasks.map((t) => t.id));
+        const existing = filteredTaskIdsByGoal[g.id];
+        if (existing) {
+          // Intersect with overdue filter
+          const userSet = new Set(matchingTasks.map((t) => t.id));
+          for (const id of existing) {
+            if (!userSet.has(id)) existing.delete(id);
+          }
+          if (existing.size === 0) return false;
+        } else {
+          filteredTaskIdsByGoal[g.id] = new Set(matchingTasks.map((t) => t.id));
+        }
       }
 
       return true;
     });
     return { filtered, filteredTaskIdsByGoal };
-  }, [proj.goals, teamFilterId, filterPrio, filterStatus, userFilterId, filterPeriodFrom, filterPeriodTo]);
+  }, [proj.goals, teamFilterId, filterPrio, filterStatus, userFilterId, filterPeriodFrom, filterPeriodTo, filterOverdue, now]);
 
-  const hasFilters = filterTeam || filterPrio || filterStatus || filterUser || filterPeriodFrom || filterPeriodTo;
+  const hasFilters = filterTeam || filterPrio || filterStatus || filterUser || filterPeriodFrom || filterPeriodTo || filterOverdue;
   const noGoals = proj.goals.length === 0;
   const noMatches = filtered.length === 0;
 
@@ -208,6 +228,18 @@ export function Goals({
               placeholder={!filterPeriodFrom && !filterPeriodTo ? "Обрати період" : undefined}
             />
           </div>
+          {filterOverdue && (
+            <Badge variant="destructive" className="gap-1 text-[11px] font-semibold">
+              <AlertTriangle className="size-3" />
+              Прострочені
+              <button
+                className="ml-0.5 hover:opacity-70"
+                onClick={() => setFilter("overdue", null)}
+              >
+                <X className="size-3" />
+              </button>
+            </Badge>
+          )}
           {hasFilters && (
             <Button
               variant="ghost"
