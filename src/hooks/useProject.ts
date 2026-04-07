@@ -345,7 +345,12 @@ export function useProject(activeProjectId: string) {
         if (t.endDate > mx) mx = t.endDate;
       });
     });
-    return { start: mn, end: mx, totalDays: Math.max(diffDays(mn, mx), 30) };
+    // Extend range by 1 month before and after for readability
+    const mnDate = new Date(mn);
+    const padStart = fmt(new Date(mnDate.getFullYear(), mnDate.getMonth() - 1, 1));
+    const mxDate = new Date(mx);
+    const padEnd = fmt(new Date(mxDate.getFullYear(), mxDate.getMonth() + 2, 0));
+    return { start: padStart, end: padEnd, totalDays: Math.max(diffDays(padStart, padEnd), 30) };
   }, [proj]);
 
   const ganttMonths: GanttMonth[] = useMemo(() => {
