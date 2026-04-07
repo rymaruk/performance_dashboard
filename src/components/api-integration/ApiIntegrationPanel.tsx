@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Plus,
@@ -11,6 +11,9 @@ import {
   Pencil,
   Save,
   X,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from "lucide-react";
 import {
   BarChart,
@@ -34,6 +37,7 @@ import {
   fetchAllPages,
   extractFieldNames,
   aggregateMultiField,
+  getNestedValue,
   type FetchProgress,
   type AggregationType,
   type ColumnConfig,
@@ -46,6 +50,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Card, CardContent } from "../ui/card";
+import { DateRangePicker } from "../ui/DateRangePicker";
 import { Separator } from "../ui/separator";
 import {
   Select,
@@ -132,9 +137,41 @@ function VirtualTable({
   onFormatChange: (idx: number, format: ColumnFormat) => void;
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const [sortCol, setSortCol] = useState<number | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const sortedRows = useMemo(() => {
+    if (sortCol === null || !cols[sortCol]) return rows;
+    const field = cols[sortCol].field;
+    const fmt = cols[sortCol].format;
+    return [...rows].sort((a, b) => {
+      const va = a.cells[field];
+      const vb = b.cells[field];
+      let cmp = 0;
+      if (fmt === "date") {
+        const da = new Date(String(va ?? "")).getTime() || 0;
+        const db = new Date(String(vb ?? "")).getTime() || 0;
+        cmp = da - db;
+      } else if (fmt === "number" || (typeof va === "number" && typeof vb === "number")) {
+        cmp = (Number(va) || 0) - (Number(vb) || 0);
+      } else {
+        cmp = String(va ?? "").localeCompare(String(vb ?? ""), "uk");
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [rows, sortCol, sortDir, cols]);
+
+  const handleSort = (idx: number) => {
+    if (sortCol === idx) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortCol(idx);
+      setSortDir("desc");
+    }
+  };
 
   const virtualizer = useVirtualizer({
-    count: rows.length,
+    count: sortedRows.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 36,
     overscan: 20,
@@ -159,10 +196,23 @@ function VirtualTable({
           </div>
           {cols.map((col, i) => (
             <div key={i} className="px-3 py-1.5 space-y-0.5">
-              <div className="text-xs font-medium text-muted-foreground">
-                {col.role === "value" && col.aggregation
-                  ? `${col.aggregation}(${col.field})`
-                  : col.field}
+              <div className="flex items-center gap-1">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {col.role === "value" && col.aggregation
+                    ? `${col.aggregation}(${col.field})`
+                    : col.field}
+                </span>
+                <button
+                  className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded"
+                  onClick={() => handleSort(i)}
+                  title="Сортувати"
+                >
+                  {sortCol === i ? (
+                    sortDir === "asc" ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />
+                  ) : (
+                    <ArrowUpDown className="size-3 opacity-40" />
+                  )}
+                </button>
               </div>
               <select
                 className="h-5 text-[10px] bg-transparent border border-border/50 rounded px-1 text-muted-foreground cursor-pointer"
@@ -180,7 +230,7 @@ function VirtualTable({
         {/* Virtualized rows */}
         <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
           {virtualizer.getVirtualItems().map((vRow) => {
-            const row = rows[vRow.index];
+            const row = sortedRows[vRow.index];
             return (
               <div
                 key={vRow.index}
@@ -261,6 +311,11 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
   const [columns, setColumns] = useState<ColumnConfig[]>([]);
   const [resultRows, setResultRows] = useState<MultiFieldRow[]>([]);
 
+  // Date filter (table mode only)
+  const [dateField, setDateField] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
   // Chart mode (bar/line/pie): simple X/Y
   const [chartGroupBy, setChartGroupBy] = useState("");
   const [chartValueField, setChartValueField] = useState("");
@@ -338,9 +393,23 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
     }
   };
 
-  // Recompute when columns or records change
+  // Filter records by date range
+  const filteredRecords = useMemo(() => {
+    if (!dateField || !dateFrom || !dateTo) return records;
+    const from = new Date(dateFrom).getTime();
+    const to = new Date(dateTo + "T23:59:59").getTime();
+    return records.filter((rec) => {
+      const raw = getNestedValue(rec, dateField);
+      const val = Array.isArray(raw) ? raw[0] : raw;
+      if (val === null || val === undefined) return false;
+      const d = new Date(String(val)).getTime();
+      return !isNaN(d) && d >= from && d <= to;
+    });
+  }, [records, dateField, dateFrom, dateTo]);
+
+  // Recompute when columns or filtered records change
   useEffect(() => {
-    if (columns.length === 0 || records.length === 0) {
+    if (columns.length === 0 || filteredRecords.length === 0) {
       setResultRows([]);
       return;
     }
@@ -349,8 +418,8 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
       setResultRows([]);
       return;
     }
-    setResultRows(aggregateMultiField(records, validCols));
-  }, [records, columns]);
+    setResultRows(aggregateMultiField(filteredRecords, validCols));
+  }, [filteredRecords, columns]);
 
   // Column helpers
   const addColumn = () => {
@@ -730,14 +799,14 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
                     value={chartType}
                     onValueChange={(v) => setChartType(v as ChartType)}
                   >
-                    <SelectTrigger className="h-7 text-xs w-[110px]">
+                    <SelectTrigger className="h-9 text-sm w-[120px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="table" className="text-xs">Таблиця</SelectItem>
-                      <SelectItem value="bar" className="text-xs">Bar</SelectItem>
-                      <SelectItem value="line" className="text-xs">Line</SelectItem>
-                      <SelectItem value="pie" className="text-xs">Pie</SelectItem>
+                      <SelectItem value="table" className="text-sm">Таблиця</SelectItem>
+                      <SelectItem value="bar" className="text-sm">Bar</SelectItem>
+                      <SelectItem value="line" className="text-sm">Line</SelectItem>
+                      <SelectItem value="pie" className="text-sm">Pie</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -746,20 +815,20 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
                 {chartType === "table" && (
                   <>
                     {/* Presets + Add column */}
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {presets.length > 0 && (
                           <>
-                            <span className="text-[10px] text-muted-foreground">Пресети:</span>
+                            <span className="text-xs text-muted-foreground">Пресети:</span>
                             {presets.map((p, i) => (
                               <button
                                 key={i}
-                                className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] hover:bg-muted/80 transition-colors"
+                                className="inline-flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-xs hover:bg-muted/80 transition-colors"
                                 onClick={() => applyPreset(p)}
                               >
                                 {p.name}
                                 <X
-                                  className="size-2.5 text-muted-foreground hover:text-destructive cursor-pointer"
+                                  className="size-3 text-muted-foreground hover:text-destructive cursor-pointer"
                                   onClick={(e) => { e.stopPropagation(); deletePreset(i); }}
                                 />
                               </button>
@@ -769,67 +838,102 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
                       </div>
                       <div className="flex items-center gap-2">
                         {columns.length > 0 && !showSavePreset && (
-                          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowSavePreset(true)}>
-                            <Save className="size-3 mr-1" />
+                          <Button size="sm" variant="ghost" onClick={() => setShowSavePreset(true)}>
+                            <Save className="size-3.5 mr-1.5" />
                             Зберегти
                           </Button>
                         )}
                         {showSavePreset && (
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1.5">
                             <Input
-                              className="h-7 text-xs w-[120px]"
+                              className="h-9 text-sm w-[150px]"
                               placeholder="Назва пресету"
                               value={presetName}
                               onChange={(e) => setPresetName(e.target.value)}
                               onKeyDown={(e) => e.key === "Enter" && handleSavePreset()}
                               autoFocus
                             />
-                            <Button size="sm" variant="default" className="h-7 text-xs px-2" onClick={handleSavePreset} disabled={!presetName.trim()}>
-                              <Save className="size-3" />
+                            <Button size="sm" variant="default" onClick={handleSavePreset} disabled={!presetName.trim()}>
+                              <Save className="size-3.5" />
                             </Button>
-                            <Button size="sm" variant="ghost" className="h-7 text-xs px-1" onClick={() => { setShowSavePreset(false); setPresetName(""); }}>
-                              <X className="size-3" />
+                            <Button size="sm" variant="ghost" onClick={() => { setShowSavePreset(false); setPresetName(""); }}>
+                              <X className="size-3.5" />
                             </Button>
                           </div>
                         )}
-                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={addColumn} disabled={columns.length >= 5}>
-                          <Plus className="size-3 mr-1" />
+                        <Button size="sm" variant="outline" onClick={addColumn} disabled={columns.length >= 5}>
+                          <Plus className="size-3.5 mr-1.5" />
                           Поле ({columns.length}/5)
                         </Button>
                       </div>
+                    </div>
+
+                    {/* Date filter */}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm whitespace-nowrap">Фільтр по даті:</Label>
+                        <Select value={dateField} onValueChange={(v) => { setDateField(v === "__none__" ? "" : v); if (v === "__none__") { setDateFrom(""); setDateTo(""); } }}>
+                          <SelectTrigger className="h-9 text-sm w-[180px]">
+                            <SelectValue placeholder="Поле дати" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__" className="text-sm">Без фільтра</SelectItem>
+                            {fieldNames.map((f) => (
+                              <SelectItem key={f} value={f} className="text-sm">{f}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {dateField && dateField !== "__none__" && (
+                        <DateRangePicker
+                          startDate={dateFrom || new Date().toISOString().slice(0, 10)}
+                          endDate={dateTo || new Date().toISOString().slice(0, 10)}
+                          onChangeRange={(from, to) => {
+                            setDateFrom(from);
+                            setDateTo(to);
+                          }}
+                          size="sm"
+                          placeholder={dateFrom && dateTo ? undefined : "Оберіть діапазон"}
+                        />
+                      )}
+                      {dateField && dateField !== "__none__" && dateFrom && dateTo && (
+                        <span className="text-xs text-muted-foreground">
+                          {filteredRecords.length} із {records.length} записів
+                        </span>
+                      )}
                     </div>
 
                     {/* Column configs */}
                     {columns.length > 0 && (
                       <div className="space-y-2">
                         {columns.map((col, idx) => (
-                          <div key={idx} className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
-                            <span className="text-[10px] text-muted-foreground w-4 shrink-0">{idx + 1}</span>
+                          <div key={idx} className="flex items-center gap-2.5 rounded-lg border bg-muted/30 px-4 py-2.5">
+                            <span className="text-xs text-muted-foreground w-5 shrink-0 font-medium">{idx + 1}</span>
                             <Select value={col.field} onValueChange={(v) => updateColumn(idx, { field: v })}>
-                              <SelectTrigger className="h-7 text-xs flex-1 min-w-0"><SelectValue placeholder="Поле" /></SelectTrigger>
-                              <SelectContent>{fieldNames.map((f) => (<SelectItem key={f} value={f} className="text-xs">{f}</SelectItem>))}</SelectContent>
+                              <SelectTrigger className="h-9 text-sm flex-1 min-w-0"><SelectValue placeholder="Оберіть поле" /></SelectTrigger>
+                              <SelectContent>{fieldNames.map((f) => (<SelectItem key={f} value={f} className="text-sm">{f}</SelectItem>))}</SelectContent>
                             </Select>
                             <Select value={col.role} onValueChange={(v) => updateColumn(idx, { role: v as "group" | "value", aggregation: v === "group" ? undefined : col.aggregation || "count" })}>
-                              <SelectTrigger className="h-7 text-xs w-[100px]"><SelectValue /></SelectTrigger>
+                              <SelectTrigger className="h-9 text-sm w-[120px]"><SelectValue /></SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="group" className="text-xs">Група</SelectItem>
-                                <SelectItem value="value" className="text-xs">Значення</SelectItem>
+                                <SelectItem value="group" className="text-sm">Група</SelectItem>
+                                <SelectItem value="value" className="text-sm">Значення</SelectItem>
                               </SelectContent>
                             </Select>
                             {col.role === "value" && (
                               <Select value={col.aggregation || "count"} onValueChange={(v) => updateColumn(idx, { aggregation: v as AggregationType })}>
-                                <SelectTrigger className="h-7 text-xs w-[90px]"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-9 text-sm w-[110px]"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="count" className="text-xs">Count</SelectItem>
-                                  <SelectItem value="sum" className="text-xs">Sum</SelectItem>
-                                  <SelectItem value="avg" className="text-xs">Avg</SelectItem>
-                                  <SelectItem value="min" className="text-xs">Min</SelectItem>
-                                  <SelectItem value="max" className="text-xs">Max</SelectItem>
+                                  <SelectItem value="count" className="text-sm">Count</SelectItem>
+                                  <SelectItem value="sum" className="text-sm">Sum</SelectItem>
+                                  <SelectItem value="avg" className="text-sm">Avg</SelectItem>
+                                  <SelectItem value="min" className="text-sm">Min</SelectItem>
+                                  <SelectItem value="max" className="text-sm">Max</SelectItem>
                                 </SelectContent>
                               </Select>
                             )}
-                            <Button variant="ghost" size="icon" className="size-6 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => removeColumn(idx)}>
-                              <Trash2 className="size-3" />
+                            <Button variant="ghost" size="icon" className="size-8 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => removeColumn(idx)}>
+                              <Trash2 className="size-4" />
                             </Button>
                           </div>
                         ))}
