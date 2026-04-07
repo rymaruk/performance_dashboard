@@ -530,6 +530,48 @@ export function useProject(activeProjectId: string) {
     }
   };
 
+  const changeGoalDateRange = async (
+    gid: string,
+    newStart: string,
+    newEnd: string,
+  ) => {
+    const g = proj.goals.find((x) => x.id === gid);
+    if (!g) return;
+    const ng = { ...g, startDate: newStart, endDate: newEnd };
+    if (ng.startDate > ng.endDate) ng.endDate = ng.startDate;
+    ng.tasks = clampTasks(ng.tasks, ng.startDate, ng.endDate);
+
+    updateLocalGoal(gid, () => ng);
+
+    await supabase
+      .from("goals")
+      .update({ start_date: ng.startDate, end_date: ng.endDate })
+      .eq("id", gid);
+
+    for (const t of ng.tasks) {
+      await supabase
+        .from("tasks")
+        .update({ start_date: t.startDate, end_date: t.endDate })
+        .eq("id", t.id);
+    }
+  };
+
+  const changeTaskDateRange = async (
+    gid: string,
+    tid: string,
+    newStart: string,
+    newEnd: string,
+  ) => {
+    const g = proj.goals.find((x) => x.id === gid);
+    if (!g) return;
+    // Clamp to goal boundaries
+    let sd = newStart < g.startDate ? g.startDate : newStart;
+    let ed = newEnd > g.endDate ? g.endDate : newEnd;
+    if (sd > ed) ed = sd;
+
+    await updateTask(gid, tid, (t) => ({ ...t, startDate: sd, endDate: ed }));
+  };
+
   /* ─── Task actions ─── */
   const addTask = async (gid: string) => {
     const g = proj.goals.find((x) => x.id === gid);
@@ -714,6 +756,8 @@ export function useProject(activeProjectId: string) {
     removeGoal,
     updateGoalField,
     changeGoalDates,
+    changeGoalDateRange,
+    changeTaskDateRange,
     addTask,
     removeTask,
     updateTask,

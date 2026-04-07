@@ -60,6 +60,8 @@ export function DashboardLayout() {
     removeGoal,
     updateGoalField,
     changeGoalDates,
+    changeGoalDateRange,
+    changeTaskDateRange,
     addTask,
     removeTask,
     updateTask,
@@ -198,6 +200,8 @@ export function DashboardLayout() {
               ganttExpanded={ganttExpanded}
               onToggleGoal={toggleGanttGoal}
               onChangeGoalDates={changeGoalDates}
+              onChangeGoalDateRange={changeGoalDateRange}
+              onChangeTaskDateRange={changeTaskDateRange}
               onChangeTaskDates={(gid, tid, field, val) =>
                 updateTask(gid, tid, (t) => ({ ...t, [field]: val }))
               }

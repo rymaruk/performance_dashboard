@@ -10,8 +10,9 @@ import {
   EmptyTitle,
 } from "../ui/empty";
 import { GANTT_PX } from "../../constants";
+import { useDragBar } from "../../hooks/useDragBar";
 import { Calendar, Link as LinkIcon } from "lucide-react";
-import type { GanttMonth, GanttRange, Project, Team } from "../../types";
+import type { Goal, Task, GanttMonth, GanttRange, Project, Team } from "../../types";
 
 interface GanttProps {
   proj: Project;
@@ -21,6 +22,8 @@ interface GanttProps {
   ganttExpanded: Record<string, boolean>;
   onToggleGoal: (id: string) => void;
   onChangeGoalDates: (gid: string, field: "startDate" | "endDate", val: string) => void;
+  onChangeGoalDateRange: (gid: string, newStart: string, newEnd: string) => void;
+  onChangeTaskDateRange: (gid: string, tid: string, newStart: string, newEnd: string) => void;
   onChangeTaskDates: (gid: string, tid: string, field: "startDate" | "endDate", val: string) => void;
 }
 
@@ -44,6 +47,139 @@ function MonthBg({ ganttMonths, pxPerDay }: { ganttMonths: GanttMonth[]; pxPerDa
   );
 }
 
+/* ── Draggable Goal Bar ── */
+
+function GoalBar({
+  goal,
+  barLeft,
+  barWidth,
+  pxPerDay,
+  ganttStart,
+  pct,
+  colorBg,
+  onDragCommit,
+  onChangeStart,
+  onChangeEnd,
+}: {
+  goal: Goal;
+  barLeft: number;
+  barWidth: number;
+  pxPerDay: number;
+  ganttStart: string;
+  pct: number;
+  colorBg: string;
+  onDragCommit: (newStart: string, newEnd: string) => void;
+  onChangeStart: (v: string) => void;
+  onChangeEnd: (v: string) => void;
+}) {
+  const { barRef, dragPos, isDragging, handlers } = useDragBar({
+    startDate: goal.startDate,
+    endDate: goal.endDate,
+    pxPerDay,
+    ganttStart,
+    onCommit: onDragCommit,
+  });
+
+  const left = isDragging ? dragPos!.left : barLeft;
+  const width = isDragging ? dragPos!.width : barWidth;
+
+  return (
+    <div
+      ref={barRef}
+      className={cn(
+        "absolute top-1 h-[18px] rounded flex items-center justify-between px-1 shadow-sm overflow-visible select-none touch-none",
+        colorBg,
+        isDragging && "opacity-80 z-10",
+      )}
+      style={{ left, width, cursor: isDragging ? "grabbing" : undefined }}
+      {...handlers}
+    >
+      {!isDragging && (
+        <DateRangePicker
+          startDate={goal.startDate}
+          endDate={goal.endDate}
+          onChangeStart={onChangeStart}
+          onChangeEnd={onChangeEnd}
+          size="sm"
+          variant="gantt"
+        />
+      )}
+      <span className="text-[9px] text-primary-foreground/80 font-semibold shrink-0">{pct}%</span>
+    </div>
+  );
+}
+
+/* ── Draggable Task Bar ── */
+
+function TaskBar({
+  task,
+  goalStartDate,
+  goalEndDate,
+  barLeft,
+  barWidth,
+  pxPerDay,
+  ganttStart,
+  colorBg,
+  isDone,
+  onDragCommit,
+  onChangeStart,
+  onChangeEnd,
+}: {
+  task: Task;
+  goalStartDate: string;
+  goalEndDate: string;
+  barLeft: number;
+  barWidth: number;
+  pxPerDay: number;
+  ganttStart: string;
+  colorBg: string;
+  isDone: boolean;
+  onDragCommit: (newStart: string, newEnd: string) => void;
+  onChangeStart: (v: string) => void;
+  onChangeEnd: (v: string) => void;
+}) {
+  const { barRef, dragPos, isDragging, handlers } = useDragBar({
+    startDate: task.startDate,
+    endDate: task.endDate,
+    pxPerDay,
+    ganttStart,
+    minDate: goalStartDate,
+    maxDate: goalEndDate,
+    onCommit: onDragCommit,
+  });
+
+  const left = isDragging ? dragPos!.left : barLeft;
+  const width = isDragging ? dragPos!.width : barWidth;
+
+  return (
+    <div
+      ref={barRef}
+      className={cn(
+        "absolute top-1 h-3 rounded-sm opacity-80 flex items-center justify-center overflow-visible select-none touch-none",
+        isDone ? "bg-muted-foreground" : colorBg,
+        isDragging && "opacity-60 z-10",
+      )}
+      style={{ left, width, cursor: isDragging ? "grabbing" : undefined }}
+      {...handlers}
+    >
+      {!isDragging && barWidth > 50 && (
+        <DateRangePicker
+          startDate={task.startDate}
+          endDate={task.endDate}
+          onChangeStart={onChangeStart}
+          onChangeEnd={onChangeEnd}
+          minDate={goalStartDate}
+          maxDate={goalEndDate}
+          size="sm"
+          variant="gantt"
+        />
+      )}
+    </div>
+  );
+}
+
+/* ── Main Gantt ── */
+
 export function Gantt({
   proj,
   teams,
@@ -52,6 +188,8 @@ export function Gantt({
   ganttExpanded,
   onToggleGoal,
   onChangeGoalDates,
+  onChangeGoalDateRange,
+  onChangeTaskDateRange,
   onChangeTaskDates,
 }: GanttProps) {
   const teamName = (teamId: string | null | undefined) =>
@@ -75,7 +213,7 @@ export function Gantt({
             <Calendar className="size-4" /> Діаграма Ганта
           </CardTitle>
           <div className="text-[11px] text-muted-foreground">
-            Клік на ціль — розгорнути задачі. Клік на дати — змінити діапазон.
+            Перетягуйте бари для зміни дат. Клік на ціль — розгорнути задачі.
           </div>
         </CardHeader>
         <CardContent>
@@ -145,22 +283,20 @@ export function Gantt({
                       <div className={cn("w-[80px] min-w-[80px] text-[10px] font-semibold px-1", gac.text)}>
                         {teamName(g.team_id)}
                       </div>
-                      <div className="flex-1 relative h-[26px]">
+                      <div className="flex-1 relative h-[26px]" onClick={(e) => e.stopPropagation()}>
                         <MonthBg ganttMonths={ganttMonths} pxPerDay={pxPerDay} />
-                        <div
-                          className={cn("absolute top-1 h-[18px] rounded flex items-center justify-between px-1 shadow-sm overflow-visible", gac.bg)}
-                          style={{ left: gBar.left, width: gBar.width }}
-                        >
-                          <DateRangePicker
-                            startDate={g.startDate}
-                            endDate={g.endDate}
-                            onChangeStart={(v) => onChangeGoalDates(g.id, "startDate", v)}
-                            onChangeEnd={(v) => onChangeGoalDates(g.id, "endDate", v)}
-                            size="sm"
-                            variant="gantt"
-                          />
-                          <span className="text-[9px] text-primary-foreground/80 font-semibold shrink-0">{pct}%</span>
-                        </div>
+                        <GoalBar
+                          goal={g}
+                          barLeft={gBar.left}
+                          barWidth={gBar.width}
+                          pxPerDay={pxPerDay}
+                          ganttStart={ganttRange.start}
+                          pct={pct}
+                          colorBg={gac.bg}
+                          onDragCommit={(s, e) => onChangeGoalDateRange(g.id, s, e)}
+                          onChangeStart={(v) => onChangeGoalDates(g.id, "startDate", v)}
+                          onChangeEnd={(v) => onChangeGoalDates(g.id, "endDate", v)}
+                        />
                       </div>
                     </div>
 
@@ -193,23 +329,20 @@ export function Gantt({
                             </div>
                             <div className="flex-1 relative h-5">
                               <MonthBg ganttMonths={ganttMonths} pxPerDay={pxPerDay} />
-                              <div
-                                className={cn("absolute top-1 h-3 rounded-sm opacity-80 flex items-center justify-center overflow-visible", isDone ? "bg-muted-foreground" : tac.bg)}
-                                style={{ left: tBar.left, width: tBar.width }}
-                              >
-                                {tBar.width > 50 && (
-                                  <DateRangePicker
-                                    startDate={t.startDate}
-                                    endDate={t.endDate}
-                                    onChangeStart={(v) => onChangeTaskDates(g.id, t.id, "startDate", v)}
-                                    onChangeEnd={(v) => onChangeTaskDates(g.id, t.id, "endDate", v)}
-                                    minDate={g.startDate}
-                                    maxDate={g.endDate}
-                                    size="sm"
-                                    variant="gantt"
-                                  />
-                                )}
-                              </div>
+                              <TaskBar
+                                task={t}
+                                goalStartDate={g.startDate}
+                                goalEndDate={g.endDate}
+                                barLeft={tBar.left}
+                                barWidth={tBar.width}
+                                pxPerDay={pxPerDay}
+                                ganttStart={ganttRange.start}
+                                colorBg={tac.bg}
+                                isDone={isDone}
+                                onDragCommit={(s, e) => onChangeTaskDateRange(g.id, t.id, s, e)}
+                                onChangeStart={(v) => onChangeTaskDates(g.id, t.id, "startDate", v)}
+                                onChangeEnd={(v) => onChangeTaskDates(g.id, t.id, "endDate", v)}
+                              />
                             </div>
                           </div>
                         );
@@ -239,7 +372,7 @@ export function Gantt({
                   <span className="font-semibold">Done</span>
                 </div>
                 <span className="text-[10px] text-muted-foreground ml-auto">
-                  ▶ Клік = задачі · 📅 Клік на дати = редагувати
+                  ↔ Перетягуйте бари · 📅 Клік = редагувати дати
                 </span>
               </div>
             </div>
