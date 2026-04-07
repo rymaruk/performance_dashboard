@@ -20,3 +20,19 @@ export const medDate = (s: string): string => {
   const d = new Date(s);
   return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getFullYear()).slice(2)}`;
 };
+
+/**
+ * Чи перетинається період цілі [goalStart, goalEnd] з обраним вікном [filterFrom, filterTo] (ISO YYYY-MM-DD).
+ * Якщо обидві межі фільтра порожні — завжди true. Достатньо однієї межі.
+ */
+export function goalPeriodOverlapsFilter(
+  goalStart: string,
+  goalEnd: string,
+  filterFrom: string | null,
+  filterTo: string | null,
+): boolean {
+  if (!filterFrom && !filterTo) return true;
+  if (filterFrom && !filterTo) return goalEnd >= filterFrom;
+  if (!filterFrom && filterTo) return goalStart <= filterTo;
+  return goalStart <= filterTo! && goalEnd >= filterFrom!;
+}

@@ -116,7 +116,7 @@ export function DashboardLayout() {
               />
             </TabsContent>
 
-            <TabsContent value="kpi">
+            <TabsContent value="kpi" className="w-full min-w-0">
               <KPIPanel proj={proj} teams={teams} onUpdateKPI={updateKPI} />
             </TabsContent>
 
