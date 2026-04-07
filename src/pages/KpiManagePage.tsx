@@ -9,6 +9,7 @@ import { getAccentDef, DEFAULT_ACCENT } from "../constants";
 import type { AccentColor } from "../constants";
 import type { KpiDefinition } from "../types";
 import { cn } from "@/lib/utils";
+import { fmtNum } from "../utils/format";
 import { ColorPicker } from "@/components/ui/color-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -343,7 +344,7 @@ export function KpiManagePage() {
                             <div className="text-sm font-semibold text-foreground">
                               {kpi.name}
                               <span className="ml-2 text-[11px] font-normal text-muted-foreground">
-                                (ціль: {kpi.target_value} {kpi.unit})
+                                (ціль: {fmtNum(kpi.target_value)} {kpi.unit})
                               </span>
                               <span className="ml-2 text-[11px] font-normal text-primary">
                                 — {kpi.goals.length} {kpi.goals.length === 1 ? "ціль" : "цілей"}
@@ -421,10 +422,10 @@ export function KpiManagePage() {
                                           pct >= 100 ? "text-success" : "text-foreground",
                                         )}
                                       >
-                                        {g.current_value}
+                                        {fmtNum(g.current_value)}
                                       </TableCell>
                                       <TableCell className="text-right text-muted-foreground">
-                                        {g.target_value} {kpi.unit}
+                                        {fmtNum(g.target_value)} {kpi.unit}
                                       </TableCell>
                                       <TableCell className="text-right">
                                         <div className="flex items-center justify-end gap-2">

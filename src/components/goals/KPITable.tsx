@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { fmtNum } from "../../utils/format";
 import { ProgressBar } from "../ui/progress-bar";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
@@ -172,7 +173,7 @@ export function KPITable({
                     isComplete ? "text-success" : kac.text,
                   )}
                 >
-                  {k.current}
+                  {fmtNum(k.current)}
                 </span>
                 <KpiEditDialog
                   kpi={k}
@@ -197,7 +198,7 @@ export function KPITable({
               {/* Footer */}
               <div className="flex items-center justify-between gap-2 text-[11px]">
                 <span className={cn("text-[13px] font-semibold", kac.text)}>
-                  Ціль: {k.target} {k.unit}
+                  Ціль: {fmtNum(k.target)} {k.unit}
                 </span>
                 <span className="flex items-center gap-1 font-medium">
                   {isComplete

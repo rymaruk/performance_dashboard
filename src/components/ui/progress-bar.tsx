@@ -5,6 +5,7 @@ interface ProgressBarProps {
   target: number;
   colorClass?: string;
   h?: number;
+  hideLabel?: boolean;
 }
 
 export function ProgressBar({
@@ -12,6 +13,7 @@ export function ProgressBar({
   target,
   colorClass = "bg-primary",
   h = 6,
+  hideLabel = false,
 }: ProgressBarProps) {
   const pct = target ? Math.min(100, Math.round((current / target) * 100)) : 0;
 
@@ -26,14 +28,16 @@ export function ProgressBar({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span
-        className={cn(
-          "text-[10px] font-bold min-w-[30px] text-right",
-          pct >= 100 ? "text-success" : "text-muted-foreground",
-        )}
-      >
-        {pct}%
-      </span>
+      {!hideLabel && (
+        <span
+          className={cn(
+            "text-[10px] font-bold min-w-[30px] text-right",
+            pct >= 100 ? "text-success" : "text-muted-foreground",
+          )}
+        >
+          {pct}%
+        </span>
+      )}
     </div>
   );
 }

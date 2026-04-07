@@ -10,6 +10,7 @@ import {
 } from "../ui/dialog";
 import { History, Loader2 } from "lucide-react";
 import { medDate } from "../../utils/date";
+import { fmtNum } from "../../utils/format";
 import { supabase } from "../../lib/supabase";
 import type { KPI, KpiValueHistory } from "../../types";
 
@@ -83,8 +84,8 @@ export function KpiHistoryDialog({ kpi }: KpiHistoryDialogProps) {
                     <td className="py-2 pr-2 tabular-nums whitespace-nowrap text-muted-foreground">
                       {medDate(h.created_at.slice(0, 10))}
                     </td>
-                    <td className="py-2 pr-2 tabular-nums">{h.old_value}</td>
-                    <td className="py-2 pr-2 tabular-nums font-semibold">{h.new_value}</td>
+                    <td className="py-2 pr-2 tabular-nums">{fmtNum(h.old_value)}</td>
+                    <td className="py-2 pr-2 tabular-nums font-semibold">{fmtNum(h.new_value)}</td>
                     <td className="py-2 pr-2 max-w-[200px] truncate" title={h.comment}>
                       {h.comment || "—"}
                     </td>

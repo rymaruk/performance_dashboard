@@ -13,6 +13,7 @@ import {
   DialogTrigger,
 } from "../ui/dialog";
 import { Pencil } from "lucide-react";
+import { fmtNum } from "../../utils/format";
 import type { KPI } from "../../types";
 
 interface KpiEditDialogProps {
@@ -74,12 +75,12 @@ export function KpiEditDialog({ kpi, onSave }: KpiEditDialogProps) {
           <div className="text-sm text-muted-foreground">
             Поточне значення:{" "}
             <span className="font-bold text-foreground tabular-nums">
-              {kpi.current} {kpi.unit}
+              {fmtNum(kpi.current)} {kpi.unit}
             </span>
             <span className="ml-2">
               Ціль:{" "}
               <span className="font-bold text-foreground tabular-nums">
-                {kpi.target} {kpi.unit}
+                {fmtNum(kpi.target)} {kpi.unit}
               </span>
             </span>
           </div>

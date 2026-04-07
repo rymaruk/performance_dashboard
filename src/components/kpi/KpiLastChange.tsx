@@ -1,30 +1,13 @@
-import { useEffect, useState } from "react";
 import { medDate } from "../../utils/date";
-import { supabase } from "../../lib/supabase";
-import type { KpiValueHistory } from "../../types";
+import { fmtNum } from "../../utils/format";
+import { useKpiLastChange } from "../../hooks/useKpiLastChange";
 
 interface KpiLastChangeProps {
   goalKpiId: string;
 }
 
 export function KpiLastChange({ goalKpiId }: KpiLastChangeProps) {
-  const [last, setLast] = useState<KpiValueHistory | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    supabase
-      .from("kpi_value_history")
-      .select("*")
-      .eq("goal_kpi_id", goalKpiId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .then(({ data }) => {
-        if (!cancelled && data && data.length > 0) {
-          setLast(data[0] as KpiValueHistory);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [goalKpiId]);
+  const { last } = useKpiLastChange(goalKpiId);
 
   if (!last) return null;
 
@@ -35,7 +18,7 @@ export function KpiLastChange({ goalKpiId }: KpiLastChangeProps) {
         <span className="tabular-nums text-muted-foreground">{medDate(last.created_at.slice(0, 10))}</span>
       </div>
       <div className="mt-1 font-bold text-foreground text-[11px]">
-        {last.old_value} → {last.new_value}
+        {fmtNum(last.old_value)} → {fmtNum(last.new_value)}
       </div>
       {last.comment && (
         <div className="mt-0.5 line-clamp-2 text-muted-foreground italic" title={last.comment}>

@@ -5,6 +5,7 @@ import { ProgressBar } from "../ui/progress-bar";
 import { KpiEditDialog } from "./KpiEditDialog";
 import { KpiHistoryDialog } from "./KpiHistoryDialog";
 import { KpiLastChange } from "./KpiLastChange";
+import { KpiDiffBadge } from "./KpiDiffBadge";
 import {
   Card,
   CardAction,
@@ -27,6 +28,7 @@ import {
   EmptyTitle,
 } from "../ui/empty";
 import { goalPeriodOverlapsFilter, medDate, today, addDays } from "../../utils/date";
+import { fmtNum } from "../../utils/format";
 import { getAccentDef } from "../../constants";
 import { BarChart3, FilterX, TrendingDown, TrendingUp, X } from "lucide-react";
 import type { Goal, KPI, Project, Team } from "../../types";
@@ -237,14 +239,23 @@ export function KPIPanel({ proj, teams, onUpdateKPI }: KPIPanelProps) {
                           className="@container/card min-w-0 w-full border-border/80 shadow-sm"
                         >
                           <CardHeader className="gap-2">
+                            <div className="flex flex-col">
+
                             <CardDescription>{k.name}</CardDescription>
+                            <div className="text-muted-foreground mb-2">
+                              Ціль: {fmtNum(k.target)} {k.unit}
+                            </div>
+                            </div>
+                            
+                          </CardHeader>
+                          <CardContent className="pt-0 mb-0">
                             <CardTitle
                               className={cn(
                                 "min-w-0 flex items-center gap-2 text-2xl font-semibold tabular-nums @[250px]/card:text-3xl",
                                 pct >= 100 ? "text-success" : kac.text,
                               )}
                             >
-                              <span>{k.current}</span>
+                              <span>{fmtNum(k.current)}</span>
                               <KpiEditDialog
                                 kpi={k}
                                 onSave={(newVal, comment, newTarget) =>
@@ -257,36 +268,38 @@ export function KPIPanel({ proj, teams, onUpdateKPI }: KPIPanelProps) {
                                 }
                               />
                             </CardTitle>
-                            <CardAction>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 min-w-0">
+                                <ProgressBar
+                                  current={k.current}
+                                  target={k.target}
+                                  colorClass={pct >= 100 ? "bg-success" : kac.bg}
+                                  h={8}
+                                  hideLabel
+                                />
+                              </div>
                               <Badge
                                 variant="outline"
-                                className="rounded-full border-border px-2 py-0.5 text-xs font-medium"
+                                className="shrink-0 rounded-full border-border px-2 py-0.5 text-xs font-medium"
                               >
                                 <TrendIcon className="size-3" />
                                 {pct}%
                               </Badge>
-                            </CardAction>
-                          </CardHeader>
-                          <CardContent className="pb-2 pt-0">
-                            <ProgressBar
-                              current={k.current}
-                              target={k.target}
-                              colorClass={pct >= 100 ? "bg-success" : kac.bg}
-                              h={8}
-                            />
+                            </div>
+                            <div className="flex items-center justify-between gap-2 w-full">
+                              <KpiDiffBadge goalKpiId={k.id} />
+                              <div className="line-clamp-1 flex items-center gap-2 font-medium text-xs">
+                                {pct >= 100
+                                  ? "Ціль досягнуто"
+                                  : onTrack
+                                    ? "Прогрес у нормі"
+                                    : "Потрібне прискорення"}
+                                <TrendIcon className="size-4 shrink-0" />
+                              </div>
+                            </div>
                           </CardContent>
                           <CardFooter className="flex flex-col items-start gap-2 text-sm">
-                            <div className="line-clamp-1 flex items-center gap-2 font-medium">
-                              {pct >= 100
-                                ? "Ціль досягнуто"
-                                : onTrack
-                                  ? "Прогрес у нормі"
-                                  : "Потрібне прискорення"}
-                              <TrendIcon className="size-4 shrink-0" />
-                            </div>
-                            <div className="text-muted-foreground mb-2">
-                              Ціль: {k.target} {k.unit}
-                            </div>
+                            
                             <KpiLastChange goalKpiId={k.id} />
                             <KpiHistoryDialog kpi={k} />
                           </CardFooter>

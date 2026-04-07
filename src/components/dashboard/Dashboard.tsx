@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { fmtNum } from "../../utils/format";
 import {
   Label,
   PolarAngleAxis,
@@ -408,7 +409,7 @@ export function Dashboard({ proj, stats, teams }: DashboardProps) {
                                                 {k.done ? "✓ " : ""}{k.name}
                                               </TableCell>
                                               <TableCell className={cn("text-right tabular-nums font-semibold", k.done ? "text-success" : "text-foreground")}>
-                                                {k.current}/{k.target} {k.unit}
+                                                {fmtNum(k.current)}/{fmtNum(k.target)} {k.unit}
                                               </TableCell>
                                               <TableCell className={cn("text-right tabular-nums font-semibold", k.done ? "text-success" : "text-muted-foreground")}>
                                                 {Math.min(k.pct, 999)}%
