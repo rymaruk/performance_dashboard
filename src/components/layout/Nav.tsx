@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
-import { BarChart3, ChartGantt, LayoutDashboard, Target } from "lucide-react";
+import { BarChart3, Cable, ChartGantt, LayoutDashboard, Target } from "lucide-react";
 import { NAV_TABS } from "../../constants";
 import type { TabKey } from "../../types";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ const TAB_ICONS: Record<TabKey, LucideIcon> = {
   goals: Target,
   kpi: BarChart3,
   gantt: ChartGantt,
+  "api-integration": Cable,
 };
 
 const TAB_KEY_TO_ROUTE: Record<TabKey, string> = {
@@ -17,6 +18,7 @@ const TAB_KEY_TO_ROUTE: Record<TabKey, string> = {
   goals: "goals",
   kpi: "kpi",
   gantt: "gantt",
+  "api-integration": "api-integration",
 };
 
 interface NavProps {

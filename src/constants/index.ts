@@ -72,4 +72,5 @@ export const NAV_TABS = [
   { k: "goals", l: "Цілі" },
   { k: "kpi",   l: "KPI" },
   { k: "gantt", l: "Gantt" },
+  { k: "api-integration", l: "API інтеграції" },
 ] as const;

@@ -1,0 +1,1056 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import {
+  Plus,
+  Trash2,
+  RefreshCw,
+  Loader2,
+  Eye,
+  EyeOff,
+  ChevronRight,
+  Pencil,
+  Save,
+  X,
+} from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
+import { supabase } from "../../lib/supabase";
+import { useAuth } from "../../hooks/AuthContext";
+import { useConfirmAction } from "../../hooks/ConfirmContext";
+import {
+  fetchAllPages,
+  extractFieldNames,
+  aggregateMultiField,
+  type FetchProgress,
+  type AggregationType,
+  type ColumnConfig,
+  type ColumnFormat,
+  type MultiFieldRow,
+} from "../../lib/integration-fetcher";
+import type { ApiIntegration } from "../../types";
+import { cn } from "@/lib/utils";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Card, CardContent } from "../ui/card";
+import { Separator } from "../ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "../ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "../ui/dialog";
+
+const CHART_COLORS = [
+  "#6366f1", "#f43f5e", "#10b981", "#f59e0b", "#0ea5e9",
+  "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#06b6d4",
+];
+
+interface AggregationPreset {
+  name: string;
+  columns: ColumnConfig[];
+  chartType: ChartType;
+}
+
+const PRESETS_KEY = "api-integration-presets";
+
+function loadPresets(): AggregationPreset[] {
+  try {
+    const raw = localStorage.getItem(PRESETS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePresets(presets: AggregationPreset[]) {
+  localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
+}
+
+type ChartType = "bar" | "line" | "pie" | "table";
+
+function formatCellValue(val: string | number, format?: ColumnFormat): string {
+  if (val === "" || val === null || val === undefined) return "";
+  switch (format) {
+    case "date": {
+      const d = new Date(typeof val === "number" ? val : String(val));
+      if (isNaN(d.getTime())) return String(val);
+      return d.toLocaleDateString("uk-UA", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+    case "number": {
+      const n = typeof val === "number" ? val : Number(val);
+      if (isNaN(n)) return String(val);
+      return n.toLocaleString("uk-UA");
+    }
+    default:
+      return typeof val === "number" ? val.toLocaleString("uk-UA") : String(val);
+  }
+}
+
+function VirtualTable({
+  rows,
+  columns: cols,
+  onFormatChange,
+}: {
+  rows: MultiFieldRow[];
+  columns: ColumnConfig[];
+  onFormatChange: (idx: number, format: ColumnFormat) => void;
+}) {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 36,
+    overscan: 20,
+  });
+
+  // Grid template: fixed # column + equal columns for each field
+  const gridCols = `40px repeat(${cols.length}, minmax(150px, 1fr))`;
+
+  return (
+    <div
+      ref={parentRef}
+      className="mt-2 max-h-[500px] overflow-auto rounded-md border"
+    >
+      <div className="min-w-max">
+        {/* Header */}
+        <div
+          className="sticky top-0 z-10 bg-card border-b grid"
+          style={{ gridTemplateColumns: gridCols }}
+        >
+          <div className="text-xs font-medium text-muted-foreground px-3 py-2">
+            #
+          </div>
+          {cols.map((col, i) => (
+            <div key={i} className="px-3 py-1.5 space-y-0.5">
+              <div className="text-xs font-medium text-muted-foreground">
+                {col.role === "value" && col.aggregation
+                  ? `${col.aggregation}(${col.field})`
+                  : col.field}
+              </div>
+              <select
+                className="h-5 text-[10px] bg-transparent border border-border/50 rounded px-1 text-muted-foreground cursor-pointer"
+                value={col.format || "text"}
+                onChange={(e) => onFormatChange(i, e.target.value as ColumnFormat)}
+              >
+                <option value="text">Текст</option>
+                <option value="number">Число</option>
+                <option value="date">Дата</option>
+              </select>
+            </div>
+          ))}
+        </div>
+
+        {/* Virtualized rows */}
+        <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
+          {virtualizer.getVirtualItems().map((vRow) => {
+            const row = rows[vRow.index];
+            return (
+              <div
+                key={vRow.index}
+                ref={virtualizer.measureElement}
+                data-index={vRow.index}
+                className="grid border-b border-border/50 hover:bg-muted/30"
+                style={{
+                  gridTemplateColumns: gridCols,
+                  position: "absolute",
+                  top: 0,
+                  transform: `translateY(${vRow.start}px)`,
+                  width: "100%",
+                }}
+              >
+                <div className="text-xs text-muted-foreground px-3 py-2">
+                  {vRow.index + 1}
+                </div>
+                {cols.map((col, j) => {
+                  const val = row.cells[col.field];
+                  return (
+                    <div
+                      key={j}
+                      className="text-xs px-3 py-2 break-words whitespace-normal text-muted-foreground"
+                    >
+                      {formatCellValue(val, col.format)}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ApiIntegrationPanel() {
+  const { profile } = useAuth();
+  const confirm = useConfirmAction();
+
+  // Integration list
+  const [integrations, setIntegrations] = useState<ApiIntegration[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Selected integration
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Add/Edit dialog
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null); // null = add mode
+  const [formName, setFormName] = useState("");
+  const [formToken, setFormToken] = useState("");
+  const [formUrl, setFormUrl] = useState("");
+  const [formPaginationParam, setFormPaginationParam] = useState("page");
+  const [formPerPageParam, setFormPerPageParam] = useState("limit");
+  const [formPerPage, setFormPerPage] = useState("50");
+  const [formAuthHeader, setFormAuthHeader] = useState("Authorization");
+  const [formAuthPrefix, setFormAuthPrefix] = useState("Bearer ");
+  const [saving, setSaving] = useState(false);
+
+  // Sync state
+  const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<FetchProgress | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  // Data & aggregation
+  const [records, setRecords] = useState<Record<string, unknown>[]>([]);
+  const [fieldNames, setFieldNames] = useState<string[]>([]);
+  const [columns, setColumns] = useState<ColumnConfig[]>([]);
+  const [chartType, setChartType] = useState<ChartType>("table");
+  const [resultRows, setResultRows] = useState<MultiFieldRow[]>([]);
+
+  // Presets
+  const [presets, setPresets] = useState<AggregationPreset[]>(loadPresets);
+  const [presetName, setPresetName] = useState("");
+  const [showSavePreset, setShowSavePreset] = useState(false);
+
+  // Token visibility per integration
+  const [visibleTokens, setVisibleTokens] = useState<Set<string>>(new Set());
+
+  const selected = integrations.find((i) => i.id === selectedId) ?? null;
+
+  // Load integrations
+  const loadIntegrations = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("api_integrations")
+      .select("*")
+      .order("created_at", { ascending: true });
+    setIntegrations((data as ApiIntegration[]) ?? []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadIntegrations();
+  }, [loadIntegrations]);
+
+  // Load cached data when selecting an integration
+  useEffect(() => {
+    if (!selectedId) {
+      setRecords([]);
+      setFieldNames([]);
+      setResultRows([]);
+      return;
+    }
+    loadRecords(selectedId);
+  }, [selectedId]);
+
+  const getStoragePath = (integrationId: string) =>
+    `${profile?.id}/${integrationId}.json`;
+
+  const loadRecords = async (integrationId: string) => {
+    if (!profile) return;
+    const path = getStoragePath(integrationId);
+
+    const { data, error } = await supabase.storage
+      .from("integration-data")
+      .download(path);
+
+    if (error || !data) {
+      setRecords([]);
+      setFieldNames([]);
+      return;
+    }
+
+    try {
+      const text = await data.text();
+      const recs = JSON.parse(text) as Record<string, unknown>[];
+      setRecords(recs);
+      if (recs.length > 0) {
+        setFieldNames(extractFieldNames(recs));
+      } else {
+        setFieldNames([]);
+      }
+    } catch {
+      setRecords([]);
+      setFieldNames([]);
+    }
+  };
+
+  // Recompute when columns or records change
+  useEffect(() => {
+    if (columns.length === 0 || records.length === 0) {
+      setResultRows([]);
+      return;
+    }
+    const validCols = columns.filter((c) => c.field);
+    if (validCols.length === 0) {
+      setResultRows([]);
+      return;
+    }
+    setResultRows(aggregateMultiField(records, validCols));
+  }, [records, columns]);
+
+  // Column helpers
+  const addColumn = () => {
+    if (columns.length >= 5) return;
+    setColumns((prev) => [
+      ...prev,
+      {
+        field: "",
+        role: prev.length === 0 ? "group" : "value",
+        aggregation: prev.length === 0 ? undefined : "count",
+      },
+    ]);
+  };
+
+  const updateColumn = (idx: number, patch: Partial<ColumnConfig>) => {
+    setColumns((prev) =>
+      prev.map((c, i) => (i === idx ? { ...c, ...patch } : c)),
+    );
+  };
+
+  const removeColumn = (idx: number) => {
+    setColumns((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // Preset management
+  const handleSavePreset = () => {
+    if (!presetName.trim() || columns.length === 0) return;
+    const newPreset: AggregationPreset = {
+      name: presetName.trim(),
+      columns: [...columns],
+      chartType,
+    };
+    const updated = [...presets, newPreset];
+    setPresets(updated);
+    savePresets(updated);
+    setPresetName("");
+    setShowSavePreset(false);
+  };
+
+  const applyPreset = (preset: AggregationPreset) => {
+    setColumns(preset.columns);
+    setChartType(preset.chartType);
+  };
+
+  const deletePreset = (idx: number) => {
+    const updated = presets.filter((_, i) => i !== idx);
+    setPresets(updated);
+    savePresets(updated);
+  };
+
+  // For charts: derive { name, value } from first group + first numeric value col
+  const chartData = (() => {
+    const groupCol = columns.find((c) => c.role === "group" && c.field);
+    const valueCol = columns.find((c) => c.role === "value" && c.field && c.aggregation);
+    if (!groupCol || !valueCol) return [];
+    return resultRows.map((r) => ({
+      name: String(r.cells[groupCol.field] ?? ""),
+      value: typeof r.cells[valueCol.field] === "number" ? r.cells[valueCol.field] as number : 0,
+    }));
+  })();
+
+  // Open dialog for adding
+  const openAddDialog = () => {
+    setEditingId(null);
+    resetForm();
+    setDialogOpen(true);
+  };
+
+  // Open dialog for editing
+  const openEditDialog = (intg: ApiIntegration) => {
+    setEditingId(intg.id);
+    setFormName(intg.name);
+    setFormToken(intg.api_token);
+    setFormUrl(intg.api_url);
+    setFormPaginationParam(intg.pagination_param);
+    setFormPerPageParam(intg.per_page_param);
+    setFormPerPage(String(intg.per_page));
+    setFormAuthHeader(intg.auth_header);
+    setFormAuthPrefix(intg.auth_prefix);
+    setDialogOpen(true);
+  };
+
+  // Save (add or update)
+  const handleSave = async () => {
+    if (!formName.trim() || !formToken.trim() || !formUrl.trim() || !profile) return;
+    setSaving(true);
+
+    const payload = {
+      name: formName.trim(),
+      api_token: formToken.trim(),
+      api_url: formUrl.trim(),
+      pagination_param: formPaginationParam.trim() || "page",
+      per_page_param: formPerPageParam.trim() || "limit",
+      per_page: parseInt(formPerPage) || 50,
+      auth_header: formAuthHeader.trim() || "Authorization",
+      auth_prefix: formAuthPrefix,
+    };
+
+    const { error } = editingId
+      ? await supabase.from("api_integrations").update(payload).eq("id", editingId)
+      : await supabase.from("api_integrations").insert({ ...payload, user_id: profile.id });
+
+    setSaving(false);
+    if (!error) {
+      setDialogOpen(false);
+      resetForm();
+      await loadIntegrations();
+    }
+  };
+
+  const resetForm = () => {
+    setEditingId(null);
+    setFormName("");
+    setFormToken("");
+    setFormUrl("");
+    setFormPaginationParam("page");
+    setFormPerPageParam("limit");
+    setFormPerPage("50");
+    setFormAuthHeader("Authorization");
+    setFormAuthPrefix("Bearer ");
+  };
+
+  // Delete integration
+  const handleDelete = (id: string) => {
+    confirm("Видалити інтеграцію? Всі завантажені дані також будуть видалені.", async () => {
+      if (profile) {
+        await supabase.storage
+          .from("integration-data")
+          .remove([getStoragePath(id)]);
+      }
+      await supabase.from("api_integrations").delete().eq("id", id);
+      if (selectedId === id) setSelectedId(null);
+      await loadIntegrations();
+    });
+  };
+
+  // Sync data — fetches ALL pages incrementally
+  const handleSyncFor = async (integrationId: string) => {
+    const intg = integrations.find((i) => i.id === integrationId);
+    if (!intg) return;
+    setSyncing(true);
+    setSyncError(null);
+    setSyncProgress(null);
+
+    try {
+      const allRecords = await fetchAllPages(
+        intg,
+        (progress) => setSyncProgress(progress),
+      );
+
+      const path = getStoragePath(intg.id);
+      await supabase.storage.from("integration-data").remove([path]);
+
+      const blob = new Blob([JSON.stringify(allRecords)], {
+        type: "application/json",
+      });
+
+      const { error: uploadErr } = await supabase.storage
+        .from("integration-data")
+        .upload(path, blob, { upsert: true });
+      if (uploadErr) throw new Error(uploadErr.message);
+
+      await supabase
+        .from("api_integrations")
+        .update({ last_synced_at: new Date().toISOString() })
+        .eq("id", intg.id);
+
+      await loadIntegrations();
+      await loadRecords(intg.id);
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : "Помилка синхронізації");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const toggleTokenVisibility = (id: string) => {
+    setVisibleTokens((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const maskToken = (token: string) => {
+    if (token.length <= 8) return "••••••••";
+    return token.slice(0, 4) + "••••••••" + token.slice(-4);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="size-5 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 md:p-6 space-y-6 max-w-6xl mx-auto">
+      {/* ─── Header ─── */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold">API інтеграції</h2>
+          <p className="text-xs text-muted-foreground">
+            Підключайте зовнішні сервіси та візуалізуйте дані
+          </p>
+        </div>
+        <Button size="sm" onClick={openAddDialog}>
+          <Plus className="size-3.5 mr-1.5" />
+          Додати сервіс
+        </Button>
+      </div>
+
+      {/* ─── Integration List ─── */}
+      {integrations.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground text-sm">
+            Немає підключених сервісів. Натисніть «Додати сервіс», щоб почати.
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="overflow-x-auto">
+          <Table className="min-w-[800px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[180px]">Назва</TableHead>
+                <TableHead>API URL</TableHead>
+                <TableHead className="w-[180px]">Токен</TableHead>
+                <TableHead className="w-[150px]">Остання синхр.</TableHead>
+                <TableHead className="w-[60px]">Синх.</TableHead>
+                <TableHead className="w-[80px]">Записів</TableHead>
+                <TableHead className="w-[80px]" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {integrations.map((intg) => (
+                <TableRow
+                  key={intg.id}
+                  className={cn(
+                    "cursor-pointer",
+                    selectedId === intg.id && "bg-muted/50",
+                  )}
+                  onClick={() =>
+                    setSelectedId(selectedId === intg.id ? null : intg.id)
+                  }
+                >
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <ChevronRight
+                        className={cn(
+                          "size-3.5 text-muted-foreground transition-transform",
+                          selectedId === intg.id && "rotate-90",
+                        )}
+                      />
+                      {intg.name}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground break-all">
+                    {intg.api_url}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <code className="text-[11px] text-muted-foreground">
+                        {visibleTokens.has(intg.id)
+                          ? intg.api_token
+                          : maskToken(intg.api_token)}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-6"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleTokenVisibility(intg.id);
+                        }}
+                      >
+                        {visibleTokens.has(intg.id) ? (
+                          <EyeOff className="size-3" />
+                        ) : (
+                          <Eye className="size-3" />
+                        )}
+                      </Button>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {intg.last_synced_at
+                      ? new Date(intg.last_synced_at).toLocaleString("uk-UA")
+                      : "—"}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      disabled={syncing && selectedId === intg.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedId(intg.id);
+                        // Trigger sync after selection
+                        setTimeout(() => {
+                          handleSyncFor(intg.id);
+                        }, 0);
+                      }}
+                    >
+                      {syncing && selectedId === intg.id ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="size-3.5" />
+                      )}
+                    </Button>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground tabular-nums">
+                    {selectedId === intg.id && syncing && syncProgress
+                      ? `${syncProgress.page}...`
+                      : selectedId === intg.id && records.length > 0
+                        ? records.length.toLocaleString("uk-UA")
+                        : "—"}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-0.5">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditDialog(intg);
+                        }}
+                      >
+                        <Pencil className="size-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7 text-destructive hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(intg.id);
+                        }}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
+
+      {/* ─── Selected Integration Panel ─── */}
+      {selected && (
+        <>
+          {syncError && (
+            <div className="rounded-md bg-destructive/10 text-destructive text-xs px-3 py-2">
+              {syncError}
+            </div>
+          )}
+
+          {/* Aggregation builder */}
+          {records.length > 0 && fieldNames.length > 0 && (
+            <Card>
+              <CardContent className="pt-5 space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h3 className="text-sm font-bold">Агрегація даних</h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Save preset */}
+                    {columns.length > 0 && !showSavePreset && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs"
+                        onClick={() => setShowSavePreset(true)}
+                      >
+                        <Save className="size-3 mr-1" />
+                        Зберегти
+                      </Button>
+                    )}
+
+                    {showSavePreset && (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          className="h-7 text-xs w-[120px]"
+                          placeholder="Назва пресету"
+                          value={presetName}
+                          onChange={(e) => setPresetName(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleSavePreset()}
+                          autoFocus
+                        />
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="h-7 text-xs px-2"
+                          onClick={handleSavePreset}
+                          disabled={!presetName.trim()}
+                        >
+                          <Save className="size-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs px-1"
+                          onClick={() => { setShowSavePreset(false); setPresetName(""); }}
+                        >
+                          <X className="size-3" />
+                        </Button>
+                      </div>
+                    )}
+
+                    <Select
+                      value={chartType}
+                      onValueChange={(v) => setChartType(v as ChartType)}
+                    >
+                      <SelectTrigger className="h-7 text-xs w-[110px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="table" className="text-xs">Таблиця</SelectItem>
+                        <SelectItem value="bar" className="text-xs">Bar</SelectItem>
+                        <SelectItem value="line" className="text-xs">Line</SelectItem>
+                        <SelectItem value="pie" className="text-xs">Pie</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={addColumn}
+                      disabled={columns.length >= 5}
+                    >
+                      <Plus className="size-3 mr-1" />
+                      Поле ({columns.length}/5)
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Saved presets chips */}
+                {presets.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] text-muted-foreground">Пресети:</span>
+                    {presets.map((p, i) => (
+                      <button
+                        key={i}
+                        className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] hover:bg-muted/80 transition-colors"
+                        onClick={() => applyPreset(p)}
+                      >
+                        {p.name}
+                        <X
+                          className="size-2.5 text-muted-foreground hover:text-destructive cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deletePreset(i);
+                          }}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Column configs */}
+                {columns.length > 0 && (
+                  <div className="space-y-2">
+                    {columns.map((col, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2"
+                      >
+                        <span className="text-[10px] text-muted-foreground w-4 shrink-0">
+                          {idx + 1}
+                        </span>
+
+                        {/* Field */}
+                        <Select
+                          value={col.field}
+                          onValueChange={(v) => updateColumn(idx, { field: v })}
+                        >
+                          <SelectTrigger className="h-7 text-xs flex-1 min-w-0">
+                            <SelectValue placeholder="Поле" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {fieldNames.map((f) => (
+                              <SelectItem key={f} value={f} className="text-xs">
+                                {f}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        {/* Role */}
+                        <Select
+                          value={col.role}
+                          onValueChange={(v) =>
+                            updateColumn(idx, {
+                              role: v as "group" | "value",
+                              aggregation: v === "group" ? undefined : col.aggregation || "count",
+                            })
+                          }
+                        >
+                          <SelectTrigger className="h-7 text-xs w-[100px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="group" className="text-xs">Група</SelectItem>
+                            <SelectItem value="value" className="text-xs">Значення</SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        {/* Aggregation (only for value columns) */}
+                        {col.role === "value" && (
+                          <Select
+                            value={col.aggregation || "count"}
+                            onValueChange={(v) =>
+                              updateColumn(idx, { aggregation: v as AggregationType })
+                            }
+                          >
+                            <SelectTrigger className="h-7 text-xs w-[90px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="count" className="text-xs">Count</SelectItem>
+                              <SelectItem value="sum" className="text-xs">Sum</SelectItem>
+                              <SelectItem value="avg" className="text-xs">Avg</SelectItem>
+                              <SelectItem value="min" className="text-xs">Min</SelectItem>
+                              <SelectItem value="max" className="text-xs">Max</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-6 shrink-0 text-muted-foreground hover:text-destructive"
+                          onClick={() => removeColumn(idx)}
+                        >
+                          <Trash2 className="size-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {columns.length === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-4">
+                    Натисніть «Поле», щоб додати колонки для агрегації (до 5)
+                  </p>
+                )}
+
+                {/* Table view (virtualized) */}
+                {resultRows.length > 0 && chartType === "table" && (
+                  <VirtualTable
+                    rows={resultRows}
+                    columns={columns.filter((c) => c.field)}
+                    onFormatChange={(visibleIdx, format) => {
+                      // Map visible column index back to the full columns array index
+                      const validCols = columns.map((c, i) => ({ c, i })).filter(({ c }) => c.field);
+                      if (validCols[visibleIdx]) {
+                        updateColumn(validCols[visibleIdx].i, { format });
+                      }
+                    }}
+                  />
+                )}
+
+                {/* Chart views */}
+                {chartData.length > 0 && chartType !== "table" && (
+                  <div className="h-[350px] mt-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      {chartType === "bar" ? (
+                        <BarChart data={chartData}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                          <XAxis dataKey="name" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                          <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                          <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }} />
+                          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                            {chartData.map((_, i) => (
+                              <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      ) : chartType === "line" ? (
+                        <LineChart data={chartData}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                          <XAxis dataKey="name" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                          <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                          <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }} />
+                          <Line type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} />
+                        </LineChart>
+                      ) : (
+                        <PieChart>
+                          <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120} label={({ name, value }) => `${name}: ${value}`} labelLine>
+                            {chartData.map((_, i) => (
+                              <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }} />
+                          <Legend />
+                        </PieChart>
+                      )}
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+
+      {/* ─── Add / Edit Dialog ─── */}
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingId ? "Редагувати сервіс" : "Додати API сервіс"}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Назва сервісу *</Label>
+              <Input
+                placeholder="KeyCRM"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">API Токен *</Label>
+              <Input
+                type="password"
+                placeholder="Ваш API ключ"
+                value={formToken}
+                onChange={(e) => setFormToken(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">API URL *</Label>
+              <Input
+                placeholder="https://openapi.keycrm.app/v1/orders"
+                value={formUrl}
+                onChange={(e) => setFormUrl(e.target.value)}
+              />
+            </div>
+
+            <Separator />
+            <p className="text-xs text-muted-foreground font-medium">
+              Налаштування пагінації та авторизації
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Параметр сторінки</Label>
+                <Input
+                  placeholder="page"
+                  value={formPaginationParam}
+                  onChange={(e) => setFormPaginationParam(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Параметр ліміту</Label>
+                <Input
+                  placeholder="limit"
+                  value={formPerPageParam}
+                  onChange={(e) => setFormPerPageParam(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Записів на сторінку</Label>
+                <Input
+                  type="number"
+                  value={formPerPage}
+                  onChange={(e) => setFormPerPage(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Auth Header</Label>
+                <Input
+                  placeholder="Authorization"
+                  value={formAuthHeader}
+                  onChange={(e) => setFormAuthHeader(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Auth Prefix</Label>
+              <Input
+                placeholder="Bearer "
+                value={formAuthPrefix}
+                onChange={(e) => setFormAuthPrefix(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setDialogOpen(false);
+                resetForm();
+              }}
+            >
+              Скасувати
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={saving || !formName.trim() || !formToken.trim() || !formUrl.trim()}
+            >
+              {saving && <Loader2 className="size-3.5 mr-1.5 animate-spin" />}
+              {editingId ? "Зберегти" : "Додати"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

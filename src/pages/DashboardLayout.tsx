@@ -6,24 +6,27 @@ import { Dashboard } from "../components/dashboard/Dashboard";
 import { Goals } from "../components/goals/Goals";
 import { KPIPanel } from "../components/kpi/KPIPanel";
 import { Gantt } from "../components/gantt/Gantt";
+import { ApiIntegrationPanel } from "../components/api-integration/ApiIntegrationPanel";
 import { Button } from "../components/ui/button";
 import { useProject } from "../hooks/useProject";
 import { useAuth } from "../hooks/AuthContext";
 import { cn } from "@/lib/utils";
 import type { TabKey } from "../types";
 
-const VALID_TABS = new Set<string>(["dashboard", "goals", "kpi", "gantt"]);
+const VALID_TABS = new Set<string>(["dashboard", "goals", "kpi", "gantt", "api-integration"]);
 const TAB_ROUTE_TO_KEY: Record<string, TabKey> = {
   dashboard: "dash",
   goals: "goals",
   kpi: "kpi",
   gantt: "gantt",
+  "api-integration": "api-integration",
 };
 const TAB_KEY_TO_ROUTE: Record<TabKey, string> = {
   dash: "dashboard",
   goals: "goals",
   kpi: "kpi",
   gantt: "gantt",
+  "api-integration": "api-integration",
 };
 
 export function DashboardLayout() {
@@ -208,6 +211,8 @@ export function DashboardLayout() {
               }
             />
           )}
+
+          {tab === "api-integration" && <ApiIntegrationPanel />}
         </Nav>
       ) : (
         <div

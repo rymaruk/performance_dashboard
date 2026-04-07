@@ -203,7 +203,7 @@ export interface ProjectRow {
 
 /* ── UI types ── */
 
-export type TabKey = "dash" | "goals" | "kpi" | "gantt";
+export type TabKey = "dash" | "goals" | "kpi" | "gantt" | "api-integration";
 
 export interface GanttMonth {
   label: string;
@@ -217,6 +217,32 @@ export interface GanttRange {
   end: string;
   totalDays: number;
 }
+
+/* ── API Integration ── */
+
+export interface ApiIntegration {
+  id: string;
+  user_id: string;
+  name: string;
+  api_token: string;
+  api_url: string;
+  pagination_param: string;
+  per_page_param: string;
+  per_page: number;
+  auth_header: string;
+  auth_prefix: string;
+  last_synced_at: string | null;
+  created_at: string;
+}
+
+export interface ApiIntegrationData {
+  id: string;
+  integration_id: string;
+  record_data: Record<string, unknown>;
+  created_at: string;
+}
+
+/* ── UI types ── */
 
 export interface ProjectStats {
   totalGoals: number;
