@@ -8,7 +8,6 @@ import { KpiLastChange } from "./KpiLastChange";
 import { KpiDiffBadge } from "./KpiDiffBadge";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardFooter,
