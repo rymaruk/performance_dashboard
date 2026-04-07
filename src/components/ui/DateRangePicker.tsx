@@ -79,7 +79,7 @@ export function DateRangePicker({
   };
 
   const disabledMatcher = useMemo(() => {
-    const matchers: Array<{ before?: Date; after?: Date }> = [];
+    const matchers: Array<{ before: Date } | { after: Date }> = [];
     if (minDate) matchers.push({ before: toDate(minDate) });
     if (maxDate) matchers.push({ after: toDate(maxDate) });
     return matchers.length > 0 ? matchers : undefined;
