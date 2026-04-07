@@ -218,7 +218,12 @@ function VirtualTable({
   );
 }
 
-export function ApiIntegrationPanel() {
+interface ApiIntegrationPanelProps {
+  projectId: string;
+  isAdmin: boolean;
+}
+
+export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelProps) {
   const { profile } = useAuth();
   const confirm = useConfirmAction();
 
@@ -277,12 +282,16 @@ export function ApiIntegrationPanel() {
     const { data } = await supabase
       .from("api_integrations")
       .select("*")
+      .eq("project_id", projectId)
       .order("created_at", { ascending: true });
     setIntegrations((data as ApiIntegration[]) ?? []);
     setLoading(false);
-  }, []);
+  }, [projectId]);
 
   useEffect(() => {
+    setSelectedId(null);
+    setColumns([]);
+    setResultRows([]);
     loadIntegrations();
   }, [loadIntegrations]);
 
@@ -444,7 +453,7 @@ export function ApiIntegrationPanel() {
 
     const { error } = editingId
       ? await supabase.from("api_integrations").update(payload).eq("id", editingId)
-      : await supabase.from("api_integrations").insert({ ...payload, user_id: profile.id });
+      : await supabase.from("api_integrations").insert({ ...payload, user_id: profile.id, project_id: projectId });
 
     setSaving(false);
     if (!error) {
@@ -552,10 +561,12 @@ export function ApiIntegrationPanel() {
             Підключайте зовнішні сервіси та візуалізуйте дані
           </p>
         </div>
-        <Button size="sm" onClick={openAddDialog}>
-          <Plus className="size-3.5 mr-1.5" />
-          Додати сервіс
-        </Button>
+        {isAdmin && (
+          <Button size="sm" onClick={openAddDialog}>
+            <Plus className="size-3.5 mr-1.5" />
+            Додати сервіс
+          </Button>
+        )}
       </div>
 
       {/* ─── Integration List ─── */}
@@ -574,9 +585,9 @@ export function ApiIntegrationPanel() {
                 <TableHead>API URL</TableHead>
                 <TableHead className="w-[180px]">Токен</TableHead>
                 <TableHead className="w-[150px]">Остання синхр.</TableHead>
-                <TableHead className="w-[60px]">Синх.</TableHead>
+                {isAdmin && <TableHead className="w-[60px]">Синх.</TableHead>}
                 <TableHead className="w-[80px]">Записів</TableHead>
-                <TableHead className="w-[80px]" />
+                {isAdmin && <TableHead className="w-[80px]" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -634,28 +645,27 @@ export function ApiIntegrationPanel() {
                       ? new Date(intg.last_synced_at).toLocaleString("uk-UA")
                       : "—"}
                   </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7"
-                      disabled={syncing && selectedId === intg.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedId(intg.id);
-                        // Trigger sync after selection
-                        setTimeout(() => {
-                          handleSyncFor(intg.id);
-                        }, 0);
-                      }}
-                    >
-                      {syncing && selectedId === intg.id ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : (
-                        <RefreshCw className="size-3.5" />
-                      )}
-                    </Button>
-                  </TableCell>
+                  {isAdmin && (
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
+                        disabled={syncing && selectedId === intg.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedId(intg.id);
+                          setTimeout(() => handleSyncFor(intg.id), 0);
+                        }}
+                      >
+                        {syncing && selectedId === intg.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="size-3.5" />
+                        )}
+                      </Button>
+                    </TableCell>
+                  )}
                   <TableCell className="text-xs text-muted-foreground tabular-nums">
                     {selectedId === intg.id && syncing && syncProgress
                       ? `${syncProgress.page}...`
@@ -663,32 +673,34 @@ export function ApiIntegrationPanel() {
                         ? records.length.toLocaleString("uk-UA")
                         : "—"}
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-0.5">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-7"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openEditDialog(intg);
-                        }}
-                      >
-                        <Pencil className="size-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-7 text-destructive hover:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(intg.id);
-                        }}
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
+                  {isAdmin && (
+                    <TableCell>
+                      <div className="flex items-center gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditDialog(intg);
+                          }}
+                        >
+                          <Pencil className="size-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 text-destructive hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(intg.id);
+                          }}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

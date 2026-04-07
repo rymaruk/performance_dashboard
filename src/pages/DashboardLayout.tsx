@@ -212,7 +212,12 @@ export function DashboardLayout() {
             />
           )}
 
-          {tab === "api-integration" && <ApiIntegrationPanel />}
+          {tab === "api-integration" && (
+            <ApiIntegrationPanel
+              projectId={urlProjectId ?? proj.id}
+              isAdmin={isAdmin}
+            />
+          )}
         </Nav>
       ) : (
         <div

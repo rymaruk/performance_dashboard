@@ -223,6 +223,7 @@ export interface GanttRange {
 export interface ApiIntegration {
   id: string;
   user_id: string;
+  project_id: string;
   name: string;
   api_token: string;
   api_url: string;
