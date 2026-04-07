@@ -35,7 +35,7 @@ interface GoalsProps {
   onChangeGoalDates: (gid: string, field: "startDate" | "endDate", val: string) => void;
   onAddKPI: (gid: string, kpiDefId: string) => void;
   onRemoveKPI: (gid: string, kid: string) => void;
-  onUpdateKPI: (gid: string, kid: string, fn: (k: KPI) => KPI) => void;
+  onUpdateKPI: (gid: string, kid: string, fn: (k: KPI) => KPI, comment?: string) => void;
   onAddTask: (gid: string) => void;
   onRemoveTask: (gid: string, tid: string) => void;
   onUpdateTask: (gid: string, tid: string, fn: (t: Task) => Task) => void;
@@ -324,7 +324,7 @@ export function Goals({
               onChangeDates={(field, val) => onChangeGoalDates(g.id, field, val)}
               onAddKPI={(kpiDefId) => onAddKPI(g.id, kpiDefId)}
               onRemoveKPI={(kid) => onRemoveKPI(g.id, kid)}
-              onUpdateKPI={(kid, fn) => onUpdateKPI(g.id, kid, fn)}
+              onUpdateKPI={(kid, fn, comment) => onUpdateKPI(g.id, kid, fn, comment)}
               onAddTask={() => onAddTask(g.id)}
               onRemoveTask={(tid) => onRemoveTask(g.id, tid)}
               onUpdateTask={(tid, fn) => onUpdateTask(g.id, tid, fn)}

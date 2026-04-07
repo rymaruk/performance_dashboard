@@ -1,16 +1,8 @@
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { Input } from "../ui/input";
 import { ProgressBar } from "../ui/progress-bar";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "../ui/field";
 import {
   Select,
   SelectContent,
@@ -29,7 +21,10 @@ import {
 } from "../ui/item";
 import { useConfirmAction } from "../../hooks/ConfirmContext";
 import { getAccentDef } from "../../constants";
-import { X, BarChart3, Plus } from "lucide-react";
+import { KpiEditDialog } from "../kpi/KpiEditDialog";
+import { KpiHistoryDialog } from "../kpi/KpiHistoryDialog";
+import { KpiLastChange } from "../kpi/KpiLastChange";
+import { X, BarChart3, Plus, TrendingUp, TrendingDown } from "lucide-react";
 import type { KPI, KpiDefinition } from "../../types";
 
 interface KPITableProps {
@@ -41,7 +36,7 @@ interface KPITableProps {
   embedded?: boolean;
   onAdd: (kpiDefId: string) => void;
   onRemove: (kid: string) => void;
-  onUpdate: (kid: string, fn: (k: KPI) => KPI) => void;
+  onUpdate: (kid: string, fn: (k: KPI) => KPI, comment?: string) => void;
 }
 
 export function KPITable({
@@ -142,111 +137,83 @@ export function KPITable({
             ? Math.min(100, Math.round((k.current / k.target) * 100))
             : 0;
           const isComplete = k.current >= k.target;
+          const onTrack = pct >= 50;
 
           return (
-            <Item key={k.id} variant="outline" size="sm" className="items-start h-full min-w-0">
-              <ItemMedia variant="icon" className="mt-0.5 size-7 [&_svg]:size-3.5">
-                <div
+            <div key={k.id} className="rounded-lg border border-border/80 p-3 min-w-0 flex flex-col gap-2">
+              {/* Header: name + delete */}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] text-muted-foreground truncate">{k.name}</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-5 shrink-0 text-destructive hover:text-destructive/80 hover:bg-destructive/10"
+                      onClick={() =>
+                        confirm(
+                          `Відʼєднати KPI «${k.name || "без назви"}» від цілі?`,
+                          () => onRemove(k.id),
+                        )
+                      }
+                    >
+                      <X className="size-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Відʼєднати KPI</TooltipContent>
+                </Tooltip>
+              </div>
+
+              {/* Value + edit */}
+              <div className="flex items-center gap-2">
+                <span
                   className={cn(
-                    "size-3 rounded-full",
-                    isComplete ? "bg-success" : kac.bg,
+                    "text-xl font-semibold tabular-nums",
+                    isComplete ? "text-success" : kac.text,
                   )}
+                >
+                  {k.current}
+                </span>
+                <KpiEditDialog
+                  kpi={k}
+                  onSave={(newVal, comment, newTarget) =>
+                    onUpdate(
+                      k.id,
+                      (kk) => ({ ...kk, current: newVal, ...(newTarget !== undefined ? { target: newTarget } : {}) }),
+                      comment,
+                    )
+                  }
                 />
-              </ItemMedia>
-              <ItemContent className="gap-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <ItemTitle className="truncate">
-                    {k.name}
-                    <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">
-                      {k.unit}
-                    </span>
-                  </ItemTitle>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-6 shrink-0 text-destructive hover:text-destructive/80 hover:bg-destructive/10"
-                        onClick={() =>
-                          confirm(
-                            `Відʼєднати KPI «${k.name || "без назви"}» від цілі?`,
-                            () => onRemove(k.id),
-                          )
-                        }
-                      >
-                        <X className="size-3.5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Відʼєднати KPI</TooltipContent>
-                  </Tooltip>
-                </div>
+                <span className="ml-auto text-[11px] font-medium text-muted-foreground">{pct}%</span>
+              </div>
 
-                <FieldGroup className="grid gap-2 space-y-0">
-                  <div className="grid grid-cols-2 gap-2 min-w-0">
-                    <Field className="min-w-0 gap-1.5">
-                      <FieldLabel
-                        htmlFor={`kpi-current-${k.id}`}
-                        className="text-[10px] text-muted-foreground"
-                      >
-                        Поточне
-                      </FieldLabel>
-                      <Input
-                        id={`kpi-current-${k.id}`}
-                        type="number"
-                        value={k.current}
-                        onChange={(e) =>
-                          onUpdate(k.id, (kk) => ({
-                            ...kk,
-                            current: Number(e.target.value) || 0,
-                          }))
-                        }
-                        className={cn(
-                          "h-7 min-w-0 text-xs font-bold px-2",
-                          isComplete ? "text-success" : kac.text,
-                        )}
-                      />
-                    </Field>
+              {/* Progress */}
+              <ProgressBar
+                current={k.current}
+                target={k.target}
+                colorClass={isComplete ? "bg-success" : kac.bg}
+              />
 
-                    <Field className="min-w-0 gap-1.5">
-                      <FieldLabel
-                        htmlFor={`kpi-target-${k.id}`}
-                        className="text-[10px] text-muted-foreground"
-                      >
-                        Ціль
-                      </FieldLabel>
-                      <Input
-                        id={`kpi-target-${k.id}`}
-                        type="number"
-                        value={k.target}
-                        onChange={(e) =>
-                          onUpdate(k.id, (kk) => ({
-                            ...kk,
-                            target: Number(e.target.value) || 0,
-                          }))
-                        }
-                        className="h-7 min-w-0 text-xs font-medium px-2"
-                      />
-                    </Field>
-                  </div>
+              {/* Footer */}
+              <div className="flex items-center justify-between gap-2 text-[11px]">
+                <span className={cn("text-[13px] font-semibold", kac.text)}>
+                  Ціль: {k.target} {k.unit}
+                </span>
+                <span className="flex items-center gap-1 font-medium">
+                  {isComplete
+                    ? "Ціль досягнуто"
+                    : onTrack
+                      ? "Прогрес у нормі"
+                      : "Потрібне прискорення"}
+                  {onTrack || isComplete
+                    ? <TrendingUp className="size-3.5 shrink-0" />
+                    : <TrendingDown className="size-3.5 shrink-0" />}
+                </span>
+              </div>
 
-                  <Field>
-                    <FieldLabel className="text-[10px] text-muted-foreground">
-                      Прогрес
-                    </FieldLabel>
-                    <FieldContent className="gap-0.5 mt-1">
-                      <ProgressBar
-                        current={k.current}
-                        target={k.target}
-                        colorClass={isComplete ? "bg-success" : kac.bg}
-                      />
-                      <FieldDescription className="text-[10px]">
-                        {k.current} / {k.target} {k.unit} ({pct}%)
-                      </FieldDescription>
-                    </FieldContent>
-                  </Field>
-                </FieldGroup>
-              </ItemContent>
-            </Item>
+              <KpiLastChange goalKpiId={k.id} />
+              <KpiHistoryDialog kpi={k} />
+            </div>
           );
           })}
         </div>

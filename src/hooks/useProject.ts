@@ -678,7 +678,13 @@ export function useProject(activeProjectId: string) {
     gid: string,
     kid: string,
     fn: (k: KPI) => KPI,
+    comment?: string,
   ) => {
+    // Capture old value before update for history
+    const goal = proj.goals.find((g) => g.id === gid);
+    const oldKpi = goal?.kpis.find((k) => k.id === kid);
+    const oldCurrent = oldKpi?.current ?? 0;
+
     let updated: KPI | null = null;
     updateLocalGoal(gid, (g) => ({
       ...g,
@@ -700,6 +706,21 @@ export function useProject(activeProjectId: string) {
           color: u.color,
         })
         .eq("id", kid);
+
+      // Insert history record if current value changed and comment provided
+      if (comment !== undefined && u.current !== oldCurrent) {
+        const { error: histErr } = await supabase.from("kpi_value_history").insert({
+          goal_kpi_id: kid,
+          old_value: oldCurrent,
+          new_value: u.current,
+          comment: comment || "",
+          user_id: profile?.id ?? null,
+          user_name: profile
+            ? `${profile.first_name} ${profile.last_name}`
+            : "",
+        });
+        if (histErr) console.error("kpi_value_history insert failed:", histErr);
+      }
     }
   };
 

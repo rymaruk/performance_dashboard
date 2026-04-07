@@ -1,8 +1,10 @@
 import { useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Editable } from "../ui";
 import { ProgressBar } from "../ui/progress-bar";
+import { KpiEditDialog } from "./KpiEditDialog";
+import { KpiHistoryDialog } from "./KpiHistoryDialog";
+import { KpiLastChange } from "./KpiLastChange";
 import {
   Card,
   CardAction,
@@ -238,22 +240,21 @@ export function KPIPanel({ proj, teams, onUpdateKPI }: KPIPanelProps) {
                             <CardDescription>{k.name}</CardDescription>
                             <CardTitle
                               className={cn(
-                                "min-w-0 text-2xl font-semibold tabular-nums @[250px]/card:text-3xl",
+                                "min-w-0 flex items-center gap-2 text-2xl font-semibold tabular-nums @[250px]/card:text-3xl",
                                 pct >= 100 ? "text-success" : kac.text,
                               )}
                             >
-                              <Editable
-                                value={k.current}
-                                onChange={(v) =>
-                                  onUpdateKPI(g.id, k.id, (kk) => ({
-                                    ...kk,
-                                    current: Number(v),
-                                  }))
+                              <span>{k.current}</span>
+                              <KpiEditDialog
+                                kpi={k}
+                                onSave={(newVal, comment, newTarget) =>
+                                  onUpdateKPI(
+                                    g.id,
+                                    k.id,
+                                    (kk) => ({ ...kk, current: newVal, ...(newTarget !== undefined ? { target: newTarget } : {}) }),
+                                    comment,
+                                  )
                                 }
-                                type="number"
-                                plain
-                                numericOnly
-                                className="block w-full min-w-0 text-inherit"
                               />
                             </CardTitle>
                             <CardAction>
@@ -274,7 +275,7 @@ export function KPIPanel({ proj, teams, onUpdateKPI }: KPIPanelProps) {
                               h={8}
                             />
                           </CardContent>
-                          <CardFooter className="flex flex-col items-start gap-1.5 text-sm">
+                          <CardFooter className="flex flex-col items-start gap-2 text-sm">
                             <div className="line-clamp-1 flex items-center gap-2 font-medium">
                               {pct >= 100
                                 ? "Ціль досягнуто"
@@ -283,9 +284,11 @@ export function KPIPanel({ proj, teams, onUpdateKPI }: KPIPanelProps) {
                                   : "Потрібне прискорення"}
                               <TrendIcon className="size-4 shrink-0" />
                             </div>
-                            <div className="text-muted-foreground">
+                            <div className="text-muted-foreground mb-2">
                               Ціль: {k.target} {k.unit}
                             </div>
+                            <KpiLastChange goalKpiId={k.id} />
+                            <KpiHistoryDialog kpi={k} />
                           </CardFooter>
                         </Card>
                       );

@@ -82,6 +82,16 @@ export interface GoalKpiRow {
   kpi_definition?: KpiDefinition;
 }
 
+export interface KpiValueHistory {
+  id: string;
+  goal_kpi_id: string;
+  old_value: number;
+  new_value: number;
+  comment: string;
+  user_id: string | null;
+  user_name: string;
+  created_at: string;
+}
 
 /* ── Task statuses ── */
 

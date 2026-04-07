@@ -60,7 +60,7 @@ interface GoalItemProps {
   onChangeDates: (field: "startDate" | "endDate", val: string) => void;
   onAddKPI: (kpiDefId: string) => void;
   onRemoveKPI: (kid: string) => void;
-  onUpdateKPI: (kid: string, fn: (k: KPI) => KPI) => void;
+  onUpdateKPI: (kid: string, fn: (k: KPI) => KPI, comment?: string) => void;
   onAddTask: () => void;
   onRemoveTask: (tid: string) => void;
   onUpdateTask: (tid: string, fn: (t: Task) => Task) => void;
