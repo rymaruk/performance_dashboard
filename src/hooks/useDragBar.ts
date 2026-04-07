@@ -4,7 +4,8 @@ import { addDays, diffDays } from "../utils/date";
 type DragMode = "move" | "resize-left" | "resize-right";
 
 const HANDLE_ZONE = 7;
-const MIN_DURATION = 1; // at least 1 day
+const MIN_DURATION = 1;
+const DRAG_THRESHOLD = 3; // px movement before drag starts
 
 interface UseDragBarOptions {
   startDate: string;
@@ -16,10 +17,6 @@ interface UseDragBarOptions {
   onCommit: (newStart: string, newEnd: string) => void;
 }
 
-/**
- * Given the original dates, a pixel delta, and a drag mode,
- * compute clamped new dates.
- */
 function computeNewDates(
   origStart: string,
   origEnd: string,
@@ -37,7 +34,6 @@ function computeNewDates(
   if (mode === "move") {
     newStart = addDays(origStart, deltaDays);
     newEnd = addDays(origEnd, deltaDays);
-    // Clamp to boundaries, preserving duration
     if (minDate && newStart < minDate) {
       newStart = minDate;
       newEnd = addDays(minDate, duration);
@@ -49,17 +45,13 @@ function computeNewDates(
     }
   } else if (mode === "resize-left") {
     newStart = addDays(origStart, deltaDays);
-    // Clamp: can't go past end - MIN_DURATION
     const maxStart = addDays(origEnd, -MIN_DURATION);
     if (newStart > maxStart) newStart = maxStart;
-    // Clamp: can't go before minDate
     if (minDate && newStart < minDate) newStart = minDate;
   } else if (mode === "resize-right") {
     newEnd = addDays(origEnd, deltaDays);
-    // Clamp: can't go before start + MIN_DURATION
     const minEnd = addDays(origStart, MIN_DURATION);
     if (newEnd < minEnd) newEnd = minEnd;
-    // Clamp: can't go past maxDate
     if (maxDate && newEnd > maxDate) newEnd = maxDate;
   }
 
@@ -76,20 +68,14 @@ export function useDragBar({
   onCommit,
 }: UseDragBarOptions) {
   const barRef = useRef<HTMLDivElement>(null);
-
-  /**
-   * During drag we store absolute pixel position { left, width }
-   * rather than offsets — this avoids dependency on potentially-changing props.
-   * null = no drag in progress.
-   */
   const [dragPos, setDragPos] = useState<{ left: number; width: number } | null>(null);
 
-  // All mutable drag state lives in a single ref — no stale closures
   const drag = useRef<{
     mode: DragMode;
     startX: number;
     origStartDate: string;
     origEndDate: string;
+    activated: boolean; // true once threshold exceeded
   } | null>(null);
 
   const datesToPx = useCallback(
@@ -102,6 +88,12 @@ export function useDragBar({
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
+      // Don't intercept clicks on interactive children (DateRangePicker button, popover, etc.)
+      const target = e.target as HTMLElement;
+      if (target.closest("[data-slot=popover-trigger], [data-slot=popover-content], [data-slot=calendar]")) {
+        return;
+      }
+
       const bar = barRef.current;
       if (!bar) return;
 
@@ -112,29 +104,44 @@ export function useDragBar({
       if (localX <= HANDLE_ZONE) mode = "resize-left";
       else if (localX >= rect.width - HANDLE_ZONE) mode = "resize-right";
 
-      // Snapshot the dates at drag start — these never change during drag
       drag.current = {
         mode,
         startX: e.clientX,
         origStartDate: startDate,
         origEndDate: endDate,
+        activated: false,
       };
 
-      // Set initial position = current bar position
-      setDragPos(datesToPx(startDate, endDate));
       bar.setPointerCapture(e.pointerId);
-      e.preventDefault();
-      e.stopPropagation();
+      // Don't preventDefault/stopPropagation yet — allow click-through until threshold
     },
-    [startDate, endDate, datesToPx],
+    [startDate, endDate],
   );
 
-  const onPointerMove = useCallback(
+  const onPointerMoveUnified = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       const d = drag.current;
-      if (!d) return;
+      if (!d) {
+        // No drag in progress — just update cursor hint
+        const bar = barRef.current;
+        if (!bar) return;
+        const rect = bar.getBoundingClientRect();
+        const localX = e.clientX - rect.left;
+        bar.style.cursor =
+          localX <= HANDLE_ZONE || localX >= rect.width - HANDLE_ZONE
+            ? "ew-resize"
+            : "grab";
+        return;
+      }
 
       const deltaPx = e.clientX - d.startX;
+
+      if (!d.activated) {
+        if (Math.abs(deltaPx) < DRAG_THRESHOLD) return;
+        d.activated = true;
+        setDragPos(datesToPx(d.origStartDate, d.origEndDate));
+      }
+
       const { newStart, newEnd } = computeNewDates(
         d.origStartDate, d.origEndDate, deltaPx, pxPerDay, d.mode, minDate, maxDate,
       );
@@ -150,51 +157,36 @@ export function useDragBar({
       const d = drag.current;
       if (!d) return;
 
-      const deltaPx = e.clientX - d.startX;
-      const { newStart, newEnd } = computeNewDates(
-        d.origStartDate, d.origEndDate, deltaPx, pxPerDay, d.mode, minDate, maxDate,
-      );
+      if (d.activated) {
+        const deltaPx = e.clientX - d.startX;
+        const { newStart, newEnd } = computeNewDates(
+          d.origStartDate, d.origEndDate, deltaPx, pxPerDay, d.mode, minDate, maxDate,
+        );
+
+        if (newStart !== d.origStartDate || newEnd !== d.origEndDate) {
+          onCommit(newStart, newEnd);
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      // If not activated (click without drag), don't prevent — let click propagate to DateRangePicker
 
       drag.current = null;
       setDragPos(null);
-
-      if (newStart !== d.origStartDate || newEnd !== d.origEndDate) {
-        onCommit(newStart, newEnd);
-      }
-
-      e.preventDefault();
-      e.stopPropagation();
     },
     [pxPerDay, minDate, maxDate, onCommit],
-  );
-
-  // Cursor hint on hover (only when not dragging)
-  const onPointerMoveHover = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (drag.current) return;
-      const bar = barRef.current;
-      if (!bar) return;
-      const rect = bar.getBoundingClientRect();
-      const localX = e.clientX - rect.left;
-      if (localX <= HANDLE_ZONE || localX >= rect.width - HANDLE_ZONE) {
-        bar.style.cursor = "ew-resize";
-      } else {
-        bar.style.cursor = "grab";
-      }
-    },
-    [],
   );
 
   const isDragging = dragPos !== null;
 
   return {
     barRef,
-    /** Absolute { left, width } in px during drag, or null. Use these to override bar style. */
     dragPos,
     isDragging,
     handlers: {
       onPointerDown,
-      onPointerMove: isDragging ? onPointerMove : onPointerMoveHover,
+      onPointerMove: onPointerMoveUnified,
       onPointerUp,
     },
   };

@@ -195,6 +195,7 @@ export function DashboardLayout() {
             <Gantt
               proj={proj}
               teams={teams}
+              teamUsers={teamUsers}
               ganttRange={ganttRange}
               ganttMonths={ganttMonths}
               ganttExpanded={ganttExpanded}

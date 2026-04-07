@@ -1,3 +1,5 @@
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { getAccentDef } from "../../constants";
 import { DateRangePicker } from "../ui";
@@ -10,13 +12,16 @@ import {
   EmptyTitle,
 } from "../ui/empty";
 import { GANTT_PX } from "../../constants";
+import { FilterSelect } from "../ui/FilterSelect";
+import { Button } from "../ui/button";
 import { useDragBar } from "../../hooks/useDragBar";
-import { Calendar, Link as LinkIcon } from "lucide-react";
-import type { Goal, Task, GanttMonth, GanttRange, Project, Team } from "../../types";
+import { Calendar, Link as LinkIcon, X, ZoomIn, ZoomOut } from "lucide-react";
+import type { Goal, Task, GanttMonth, GanttRange, Project, Team, UserProfile } from "../../types";
 
 interface GanttProps {
   proj: Project;
   teams: Team[];
+  teamUsers: Record<string, UserProfile[]>;
   ganttRange: GanttRange;
   ganttMonths: GanttMonth[];
   ganttExpanded: Record<string, boolean>;
@@ -25,6 +30,50 @@ interface GanttProps {
   onChangeGoalDateRange: (gid: string, newStart: string, newEnd: string) => void;
   onChangeTaskDateRange: (gid: string, tid: string, newStart: string, newEnd: string) => void;
   onChangeTaskDates: (gid: string, tid: string, field: "startDate" | "endDate", val: string) => void;
+}
+
+/* ── Column resize handle ── */
+
+function ColResizeHandle({ onDelta }: { onDelta: (deltaPx: number) => void }) {
+  const startX = useRef(0);
+
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      startX.current = e.clientX;
+      (e.target as HTMLDivElement).setPointerCapture(e.pointerId);
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    [],
+  );
+
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+      const delta = e.clientX - startX.current;
+      startX.current = e.clientX;
+      onDelta(delta);
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    [onDelta],
+  );
+
+  const onPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      (e.target as HTMLDivElement).releasePointerCapture(e.pointerId);
+    },
+    [],
+  );
+
+  return (
+    <div
+      className="absolute top-0 bottom-0 w-[5px] -right-[2px] z-[3] cursor-col-resize hover:bg-primary/20 active:bg-primary/30 touch-none"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+    />
+  );
 }
 
 function MonthBg({ ganttMonths, pxPerDay }: { ganttMonths: GanttMonth[]; pxPerDay: number }) {
@@ -94,7 +143,7 @@ function GoalBar({
       style={{ left, width, cursor: isDragging ? "grabbing" : undefined }}
       {...handlers}
     >
-      {!isDragging && (
+      {
         <DateRangePicker
           startDate={goal.startDate}
           endDate={goal.endDate}
@@ -103,7 +152,7 @@ function GoalBar({
           size="sm"
           variant="gantt"
         />
-      )}
+      }
       <span className="text-[9px] text-primary-foreground/80 font-semibold shrink-0">{pct}%</span>
     </div>
   );
@@ -162,7 +211,7 @@ function TaskBar({
       style={{ left, width, cursor: isDragging ? "grabbing" : undefined }}
       {...handlers}
     >
-      {!isDragging && barWidth > 50 && (
+      {barWidth > 50 && (
         <DateRangePicker
           startDate={task.startDate}
           endDate={task.endDate}
@@ -183,6 +232,7 @@ function TaskBar({
 export function Gantt({
   proj,
   teams,
+  teamUsers,
   ganttRange,
   ganttMonths,
   ganttExpanded,
@@ -194,7 +244,85 @@ export function Gantt({
 }: GanttProps) {
   const teamName = (teamId: string | null | undefined) =>
     teams.find((t) => t.id === teamId)?.name ?? "Без команди";
-  const pxPerDay = GANTT_PX / Math.max(ganttRange.totalDays, 1);
+
+  const userName = useCallback(
+    (userId: string | null | undefined): string | null => {
+      if (!userId) return null;
+      for (const users of Object.values(teamUsers)) {
+        const u = users.find((x) => x.id === userId);
+        if (u) return `${u.first_name} ${u.last_name}`;
+      }
+      return null;
+    },
+    [teamUsers],
+  );
+
+  /* ── Filters (synced with URL) ── */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterTeam = searchParams.get("team");
+  const filterUser = searchParams.get("user");
+
+  const setFilter = useCallback(
+    (key: string, value: string | null) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        return next;
+      }, { replace: true });
+    },
+    [setSearchParams],
+  );
+
+  const teamOptions = useMemo(() => teams.map((t) => `${t.name}::${t.id}`), [teams]);
+
+  const teamFilterId = useMemo(() => {
+    if (!filterTeam) return null;
+    const sep = filterTeam.indexOf("::");
+    return sep >= 0 ? filterTeam.slice(sep + 2) : null;
+  }, [filterTeam]);
+
+  const allUsers = useMemo(() => {
+    const map = new Map<string, UserProfile>();
+    for (const users of Object.values(teamUsers)) {
+      for (const u of users) map.set(u.id, u);
+    }
+    return [...map.values()];
+  }, [teamUsers]);
+
+  const userOptions = useMemo(
+    () => allUsers.map((u) => `${u.first_name} ${u.last_name}::${u.id}`),
+    [allUsers],
+  );
+
+  const userFilterId = useMemo(() => {
+    if (!filterUser) return null;
+    const sep = filterUser.indexOf("::");
+    return sep >= 0 ? filterUser.slice(sep + 2) : null;
+  }, [filterUser]);
+
+  const filteredGoals = useMemo(() => {
+    return proj.goals.filter((g) => {
+      if (teamFilterId && g.team_id !== teamFilterId) return false;
+      if (userFilterId) {
+        const hasMatchingTask = g.tasks.some((t) => t.user_id === userFilterId);
+        if (!hasMatchingTask) return false;
+      }
+      return true;
+    });
+  }, [proj.goals, teamFilterId, userFilterId]);
+
+  const hasFilters = Boolean(filterTeam || filterUser);
+
+  /* ── Column widths ── */
+  const [colNameW, setColNameW] = useState(260);
+  const [colWhoW, setColWhoW] = useState(80);
+
+  /* ── Zoom ── */
+  const MIN_CHART_W = 400;
+  const MAX_CHART_W = 4000;
+  const [chartWidth, setChartWidth] = useState(GANTT_PX);
+  const pxPerDay = chartWidth / Math.max(ganttRange.totalDays, 1);
 
   const barPos = (sd: string, ed: string) => {
     const diff = (a: string, b: string) =>
@@ -212,9 +340,64 @@ export function Gantt({
           <CardTitle className="text-[15px] flex items-center gap-1.5">
             <Calendar className="size-4" /> Діаграма Ганта
           </CardTitle>
-          <div className="text-[11px] text-muted-foreground">
-            Перетягуйте бари для зміни дат. Клік на ціль — розгорнути задачі.
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="text-[11px] text-muted-foreground">
+              Перетягуйте бари для зміни дат. Клік на ціль — розгорнути задачі.
+            </div>
+            {proj.goals.length > 0 && (
+              <div className="flex items-center gap-2">
+                <ZoomOut className="size-3.5 text-muted-foreground" />
+                <input
+                  type="range"
+                  min={MIN_CHART_W}
+                  max={MAX_CHART_W}
+                  step={50}
+                  value={chartWidth}
+                  onChange={(e) => setChartWidth(Number(e.target.value))}
+                  className="w-24 h-1.5 accent-primary cursor-pointer"
+                />
+                <ZoomIn className="size-3.5 text-muted-foreground" />
+                <span className="text-[10px] text-muted-foreground tabular-nums w-8">
+                  {Math.round((chartWidth / GANTT_PX) * 100)}%
+                </span>
+              </div>
+            )}
           </div>
+          {proj.goals.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 pt-2">
+              <span className="text-[11px] font-semibold text-muted-foreground">Фільтри:</span>
+              <FilterSelect
+                label="Команда"
+                value={filterTeam}
+                options={teamOptions}
+                onChange={(v) => setFilter("team", v)}
+                renderOption={(opt) => {
+                  const sep = opt.indexOf("::");
+                  return sep >= 0 ? opt.slice(0, sep) : opt;
+                }}
+              />
+              <FilterSelect
+                label="Користувач"
+                value={filterUser}
+                options={userOptions}
+                onChange={(v) => setFilter("user", v)}
+                renderOption={(opt) => {
+                  const sep = opt.indexOf("::");
+                  return sep >= 0 ? opt.slice(0, sep) : opt;
+                }}
+              />
+              {hasFilters && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSearchParams({}, { replace: true })}
+                  className="text-destructive hover:text-destructive/80 h-7"
+                >
+                  <X className="size-3" /> Скинути
+                </Button>
+              )}
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {proj.goals.length === 0 ? (
@@ -230,39 +413,43 @@ export function Gantt({
               </EmptyHeader>
             </Empty>
           ) : (
-            <div style={{ minWidth: GANTT_PX + 340 }}>
+            <div style={{ minWidth: chartWidth + colNameW + colWhoW }}>
               <div className="flex border-b-2 border-border bg-card sticky top-0 z-[2]">
-                <div className="w-[260px] min-w-[260px] px-2.5 py-2 font-bold text-[11px] text-foreground">
+                <div className="relative px-2.5 py-2 font-bold text-[11px] text-foreground" style={{ width: colNameW, minWidth: 120 }}>
                   Ціль / Задача
+                  <ColResizeHandle onDelta={(d) => setColNameW((w) => Math.max(120, w + d))} />
                 </div>
-                <div className="w-[80px] min-w-[80px] px-1 py-2 font-bold text-[11px] text-foreground">
+                <div className="relative pl-0 pr-1 py-2 font-bold text-[11px] text-foreground" style={{ width: colWhoW, minWidth: 60 }}>
                   Хто
+                  <ColResizeHandle onDelta={(d) => setColWhoW((w) => Math.max(60, w + d))} />
                 </div>
                 <div className="flex-1 flex relative">
-                  {(() => {
-                    let acc = 0;
-                    return ganttMonths.map((m, i) => {
-                      const w = m.days * pxPerDay;
-                      const el = (
-                        <div
-                          key={i}
-                          className={cn(
-                            "text-center py-2 font-semibold text-[10px] text-muted-foreground border-l border-border overflow-hidden",
-                            i % 2 ? "bg-muted/30" : "bg-transparent",
-                          )}
-                          style={{ width: w, minWidth: w }}
-                        >
-                          {w > 30 ? `${m.label} ${m.year}` : w > 18 ? m.label : ""}
-                        </div>
-                      );
-                      acc += w;
-                      return el;
-                    });
-                  })()}
+                  {ganttMonths.map((m, i) => {
+                    const w = m.days * pxPerDay;
+                    return (
+                      <div
+                        key={i}
+                        className={cn(
+                          "relative text-center py-2 font-semibold text-[10px] text-muted-foreground border-l border-border overflow-visible",
+                          i % 2 ? "bg-muted/30" : "bg-transparent",
+                        )}
+                        style={{ width: w, minWidth: w }}
+                      >
+                        {w > 30 ? `${m.label} ${m.year}` : w > 18 ? m.label : ""}
+                        <ColResizeHandle
+                          onDelta={(delta) => {
+                            // Scale total chart width proportionally to the drag on this column
+                            const scale = (w + delta) / Math.max(w, 1);
+                            setChartWidth((prev) => Math.max(MIN_CHART_W, Math.min(MAX_CHART_W, Math.round(prev * scale))));
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              {proj.goals.map((g) => {
+              {filteredGoals.map((g) => {
                 const gac = getAccentDef(g.color);
                 const gOpen = ganttExpanded[g.id];
                 const doneTasks = g.tasks.filter((t) => t.status === "Done").length;
@@ -275,12 +462,12 @@ export function Gantt({
                       className={cn("flex items-center h-[34px] border-b border-border cursor-pointer", gac.bgLight)}
                       onClick={() => onToggleGoal(g.id)}
                     >
-                      <div className="w-[260px] min-w-[260px] px-2.5 flex items-center gap-1.5 overflow-hidden">
+                      <div className="px-2.5 flex items-center gap-1.5 overflow-hidden" style={{ width: colNameW, minWidth: 120 }}>
                         <span className={cn("text-[11px] font-bold transition-transform", gOpen && "rotate-90")}>▶</span>
                         <span className={cn("w-2 h-2 rounded-full shrink-0", gac.bg)} />
                         <span className="text-xs font-bold truncate">{g.title || "—"}</span>
                       </div>
-                      <div className={cn("w-[80px] min-w-[80px] text-[10px] font-semibold px-1", gac.text)}>
+                      <div className={cn("text-[10px] font-semibold pl-0 pr-1 truncate", gac.text)} style={{ width: colWhoW, minWidth: 60 }}>
                         {teamName(g.team_id)}
                       </div>
                       <div className="flex-1 relative h-[26px]" onClick={(e) => e.stopPropagation()}>
@@ -308,9 +495,9 @@ export function Gantt({
                         return (
                           <div
                             key={t.id}
-                            className={cn("flex items-center h-7 border-b border-border/50", isDone ? "bg-success/5" : "bg-card")}
+                            className={cn("flex items-center min-h-7 py-0.5 border-b border-border/50", isDone ? "bg-success/5" : "bg-card")}
                           >
-                            <div className="w-[260px] min-w-[260px] pl-8 pr-2.5 flex items-center gap-1 overflow-hidden">
+                            <div className="pl-8 pr-2.5 flex items-center gap-1 overflow-hidden" style={{ width: colNameW, minWidth: 120 }}>
                               <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", tac.bg)} />
                               <span
                                 className={cn("text-[11px] truncate", isDone ? "text-muted-foreground line-through" : "text-foreground")}
@@ -324,8 +511,8 @@ export function Gantt({
                                 </span>
                               )}
                             </div>
-                            <div className={cn("w-[80px] min-w-[80px] text-[10px] font-semibold px-1", tac.text)}>
-                              {t.assignee}
+                            <div className="text-[10px] pl-0 pr-1 truncate text-muted-foreground" style={{ width: colWhoW, minWidth: 60 }}>
+                              {userName(t.user_id) || "—"}
                             </div>
                             <div className="flex-1 relative h-5">
                               <MonthBg ganttMonths={ganttMonths} pxPerDay={pxPerDay} />
@@ -358,7 +545,7 @@ export function Gantt({
               })}
 
               <div className="flex gap-5 px-2.5 py-3.5 flex-wrap">
-                {proj.goals.map((g) => {
+                {filteredGoals.map((g) => {
                   const lac = getAccentDef(g.color);
                   return (
                     <div key={g.id} className="flex items-center gap-1 text-[11px] text-foreground">
