@@ -250,9 +250,16 @@ export function ApiIntegrationPanel() {
   // Data & aggregation
   const [records, setRecords] = useState<Record<string, unknown>[]>([]);
   const [fieldNames, setFieldNames] = useState<string[]>([]);
-  const [columns, setColumns] = useState<ColumnConfig[]>([]);
   const [chartType, setChartType] = useState<ChartType>("table");
+
+  // Table mode: multi-column (up to 5) with presets
+  const [columns, setColumns] = useState<ColumnConfig[]>([]);
   const [resultRows, setResultRows] = useState<MultiFieldRow[]>([]);
+
+  // Chart mode (bar/line/pie): simple X/Y
+  const [chartGroupBy, setChartGroupBy] = useState("");
+  const [chartValueField, setChartValueField] = useState("");
+  const [chartAggregation, setChartAggregation] = useState<AggregationType>("count");
 
   // Presets
   const [presets, setPresets] = useState<AggregationPreset[]>(loadPresets);
@@ -385,14 +392,16 @@ export function ApiIntegrationPanel() {
     savePresets(updated);
   };
 
-  // For charts: derive { name, value } from first group + first numeric value col
+  // For charts (bar/line/pie): simple X/Y aggregation
   const chartData = (() => {
-    const groupCol = columns.find((c) => c.role === "group" && c.field);
-    const valueCol = columns.find((c) => c.role === "value" && c.field && c.aggregation);
-    if (!groupCol || !valueCol) return [];
-    return resultRows.map((r) => ({
-      name: String(r.cells[groupCol.field] ?? ""),
-      value: typeof r.cells[valueCol.field] === "number" ? r.cells[valueCol.field] as number : 0,
+    if (chartType === "table" || !chartGroupBy || !chartValueField || records.length === 0) return [];
+    const rows = aggregateMultiField(records, [
+      { field: chartGroupBy, role: "group" },
+      { field: chartValueField, role: "value", aggregation: chartAggregation },
+    ]);
+    return rows.slice(0, 50).map((r) => ({
+      name: String(r.cells[chartGroupBy] ?? ""),
+      value: typeof r.cells[chartValueField] === "number" ? r.cells[chartValueField] as number : 0,
     }));
   })();
 
@@ -696,246 +705,213 @@ export function ApiIntegrationPanel() {
             </div>
           )}
 
-          {/* Aggregation builder */}
+          {/* Aggregation / Chart builder */}
           {records.length > 0 && fieldNames.length > 0 && (
             <Card>
               <CardContent className="pt-5 space-y-4">
+                {/* Header with type selector */}
                 <div className="flex items-center justify-between flex-wrap gap-2">
-                  <h3 className="text-sm font-bold">Агрегація даних</h3>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {/* Save preset */}
-                    {columns.length > 0 && !showSavePreset && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 text-xs"
-                        onClick={() => setShowSavePreset(true)}
-                      >
-                        <Save className="size-3 mr-1" />
-                        Зберегти
-                      </Button>
-                    )}
-
-                    {showSavePreset && (
-                      <div className="flex items-center gap-1">
-                        <Input
-                          className="h-7 text-xs w-[120px]"
-                          placeholder="Назва пресету"
-                          value={presetName}
-                          onChange={(e) => setPresetName(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && handleSavePreset()}
-                          autoFocus
-                        />
-                        <Button
-                          size="sm"
-                          variant="default"
-                          className="h-7 text-xs px-2"
-                          onClick={handleSavePreset}
-                          disabled={!presetName.trim()}
-                        >
-                          <Save className="size-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 text-xs px-1"
-                          onClick={() => { setShowSavePreset(false); setPresetName(""); }}
-                        >
-                          <X className="size-3" />
-                        </Button>
-                      </div>
-                    )}
-
-                    <Select
-                      value={chartType}
-                      onValueChange={(v) => setChartType(v as ChartType)}
-                    >
-                      <SelectTrigger className="h-7 text-xs w-[110px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="table" className="text-xs">Таблиця</SelectItem>
-                        <SelectItem value="bar" className="text-xs">Bar</SelectItem>
-                        <SelectItem value="line" className="text-xs">Line</SelectItem>
-                        <SelectItem value="pie" className="text-xs">Pie</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs"
-                      onClick={addColumn}
-                      disabled={columns.length >= 5}
-                    >
-                      <Plus className="size-3 mr-1" />
-                      Поле ({columns.length}/5)
-                    </Button>
-                  </div>
+                  <h3 className="text-sm font-bold">
+                    {chartType === "table" ? "Агрегація даних" : "Побудова графіка"}
+                  </h3>
+                  <Select
+                    value={chartType}
+                    onValueChange={(v) => setChartType(v as ChartType)}
+                  >
+                    <SelectTrigger className="h-7 text-xs w-[110px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="table" className="text-xs">Таблиця</SelectItem>
+                      <SelectItem value="bar" className="text-xs">Bar</SelectItem>
+                      <SelectItem value="line" className="text-xs">Line</SelectItem>
+                      <SelectItem value="pie" className="text-xs">Pie</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                {/* Saved presets chips */}
-                {presets.length > 0 && (
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] text-muted-foreground">Пресети:</span>
-                    {presets.map((p, i) => (
-                      <button
-                        key={i}
-                        className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] hover:bg-muted/80 transition-colors"
-                        onClick={() => applyPreset(p)}
-                      >
-                        {p.name}
-                        <X
-                          className="size-2.5 text-muted-foreground hover:text-destructive cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deletePreset(i);
-                          }}
-                        />
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Column configs */}
-                {columns.length > 0 && (
-                  <div className="space-y-2">
-                    {columns.map((col, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2"
-                      >
-                        <span className="text-[10px] text-muted-foreground w-4 shrink-0">
-                          {idx + 1}
-                        </span>
-
-                        {/* Field */}
-                        <Select
-                          value={col.field}
-                          onValueChange={(v) => updateColumn(idx, { field: v })}
-                        >
-                          <SelectTrigger className="h-7 text-xs flex-1 min-w-0">
-                            <SelectValue placeholder="Поле" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {fieldNames.map((f) => (
-                              <SelectItem key={f} value={f} className="text-xs">
-                                {f}
-                              </SelectItem>
+                {/* ═══ TABLE MODE: multi-column + presets ═══ */}
+                {chartType === "table" && (
+                  <>
+                    {/* Presets + Add column */}
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {presets.length > 0 && (
+                          <>
+                            <span className="text-[10px] text-muted-foreground">Пресети:</span>
+                            {presets.map((p, i) => (
+                              <button
+                                key={i}
+                                className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] hover:bg-muted/80 transition-colors"
+                                onClick={() => applyPreset(p)}
+                              >
+                                {p.name}
+                                <X
+                                  className="size-2.5 text-muted-foreground hover:text-destructive cursor-pointer"
+                                  onClick={(e) => { e.stopPropagation(); deletePreset(i); }}
+                                />
+                              </button>
                             ))}
-                          </SelectContent>
-                        </Select>
-
-                        {/* Role */}
-                        <Select
-                          value={col.role}
-                          onValueChange={(v) =>
-                            updateColumn(idx, {
-                              role: v as "group" | "value",
-                              aggregation: v === "group" ? undefined : col.aggregation || "count",
-                            })
-                          }
-                        >
-                          <SelectTrigger className="h-7 text-xs w-[100px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="group" className="text-xs">Група</SelectItem>
-                            <SelectItem value="value" className="text-xs">Значення</SelectItem>
-                          </SelectContent>
-                        </Select>
-
-                        {/* Aggregation (only for value columns) */}
-                        {col.role === "value" && (
-                          <Select
-                            value={col.aggregation || "count"}
-                            onValueChange={(v) =>
-                              updateColumn(idx, { aggregation: v as AggregationType })
-                            }
-                          >
-                            <SelectTrigger className="h-7 text-xs w-[90px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="count" className="text-xs">Count</SelectItem>
-                              <SelectItem value="sum" className="text-xs">Sum</SelectItem>
-                              <SelectItem value="avg" className="text-xs">Avg</SelectItem>
-                              <SelectItem value="min" className="text-xs">Min</SelectItem>
-                              <SelectItem value="max" className="text-xs">Max</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          </>
                         )}
-
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-6 shrink-0 text-muted-foreground hover:text-destructive"
-                          onClick={() => removeColumn(idx)}
-                        >
-                          <Trash2 className="size-3" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {columns.length > 0 && !showSavePreset && (
+                          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowSavePreset(true)}>
+                            <Save className="size-3 mr-1" />
+                            Зберегти
+                          </Button>
+                        )}
+                        {showSavePreset && (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              className="h-7 text-xs w-[120px]"
+                              placeholder="Назва пресету"
+                              value={presetName}
+                              onChange={(e) => setPresetName(e.target.value)}
+                              onKeyDown={(e) => e.key === "Enter" && handleSavePreset()}
+                              autoFocus
+                            />
+                            <Button size="sm" variant="default" className="h-7 text-xs px-2" onClick={handleSavePreset} disabled={!presetName.trim()}>
+                              <Save className="size-3" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 text-xs px-1" onClick={() => { setShowSavePreset(false); setPresetName(""); }}>
+                              <X className="size-3" />
+                            </Button>
+                          </div>
+                        )}
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={addColumn} disabled={columns.length >= 5}>
+                          <Plus className="size-3 mr-1" />
+                          Поле ({columns.length}/5)
                         </Button>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+
+                    {/* Column configs */}
+                    {columns.length > 0 && (
+                      <div className="space-y-2">
+                        {columns.map((col, idx) => (
+                          <div key={idx} className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
+                            <span className="text-[10px] text-muted-foreground w-4 shrink-0">{idx + 1}</span>
+                            <Select value={col.field} onValueChange={(v) => updateColumn(idx, { field: v })}>
+                              <SelectTrigger className="h-7 text-xs flex-1 min-w-0"><SelectValue placeholder="Поле" /></SelectTrigger>
+                              <SelectContent>{fieldNames.map((f) => (<SelectItem key={f} value={f} className="text-xs">{f}</SelectItem>))}</SelectContent>
+                            </Select>
+                            <Select value={col.role} onValueChange={(v) => updateColumn(idx, { role: v as "group" | "value", aggregation: v === "group" ? undefined : col.aggregation || "count" })}>
+                              <SelectTrigger className="h-7 text-xs w-[100px]"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="group" className="text-xs">Група</SelectItem>
+                                <SelectItem value="value" className="text-xs">Значення</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {col.role === "value" && (
+                              <Select value={col.aggregation || "count"} onValueChange={(v) => updateColumn(idx, { aggregation: v as AggregationType })}>
+                                <SelectTrigger className="h-7 text-xs w-[90px]"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="count" className="text-xs">Count</SelectItem>
+                                  <SelectItem value="sum" className="text-xs">Sum</SelectItem>
+                                  <SelectItem value="avg" className="text-xs">Avg</SelectItem>
+                                  <SelectItem value="min" className="text-xs">Min</SelectItem>
+                                  <SelectItem value="max" className="text-xs">Max</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
+                            <Button variant="ghost" size="icon" className="size-6 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => removeColumn(idx)}>
+                              <Trash2 className="size-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {columns.length === 0 && (
+                      <p className="text-xs text-muted-foreground text-center py-4">
+                        Натисніть «Поле», щоб додати колонки для агрегації (до 5)
+                      </p>
+                    )}
+
+                    {/* Virtualized table */}
+                    {resultRows.length > 0 && (
+                      <VirtualTable
+                        rows={resultRows}
+                        columns={columns.filter((c) => c.field)}
+                        onFormatChange={(visibleIdx, format) => {
+                          const validCols = columns.map((c, i) => ({ c, i })).filter(({ c }) => c.field);
+                          if (validCols[visibleIdx]) updateColumn(validCols[visibleIdx].i, { format });
+                        }}
+                      />
+                    )}
+                  </>
                 )}
 
-                {columns.length === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-4">
-                    Натисніть «Поле», щоб додати колонки для агрегації (до 5)
-                  </p>
-                )}
+                {/* ═══ CHART MODE: simple X / Y ═══ */}
+                {chartType !== "table" && (
+                  <>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Групувати по (X)</Label>
+                        <Select value={chartGroupBy} onValueChange={setChartGroupBy}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Оберіть поле" /></SelectTrigger>
+                          <SelectContent>{fieldNames.map((f) => (<SelectItem key={f} value={f} className="text-xs">{f}</SelectItem>))}</SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Значення (Y)</Label>
+                        <Select value={chartValueField} onValueChange={setChartValueField}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Оберіть поле" /></SelectTrigger>
+                          <SelectContent>{fieldNames.map((f) => (<SelectItem key={f} value={f} className="text-xs">{f}</SelectItem>))}</SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Агрегація</Label>
+                        <Select value={chartAggregation} onValueChange={(v) => setChartAggregation(v as AggregationType)}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="count" className="text-xs">Count</SelectItem>
+                            <SelectItem value="sum" className="text-xs">Sum</SelectItem>
+                            <SelectItem value="avg" className="text-xs">Average</SelectItem>
+                            <SelectItem value="min" className="text-xs">Min</SelectItem>
+                            <SelectItem value="max" className="text-xs">Max</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
 
-                {/* Table view (virtualized) */}
-                {resultRows.length > 0 && chartType === "table" && (
-                  <VirtualTable
-                    rows={resultRows}
-                    columns={columns.filter((c) => c.field)}
-                    onFormatChange={(visibleIdx, format) => {
-                      // Map visible column index back to the full columns array index
-                      const validCols = columns.map((c, i) => ({ c, i })).filter(({ c }) => c.field);
-                      if (validCols[visibleIdx]) {
-                        updateColumn(validCols[visibleIdx].i, { format });
-                      }
-                    }}
-                  />
-                )}
-
-                {/* Chart views */}
-                {chartData.length > 0 && chartType !== "table" && (
-                  <div className="h-[350px] mt-2">
-                    <ResponsiveContainer width="100%" height="100%">
-                      {chartType === "bar" ? (
-                        <BarChart data={chartData}>
-                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                          <XAxis dataKey="name" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                          <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                          <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }} />
-                          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                            {chartData.map((_, i) => (
-                              <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      ) : chartType === "line" ? (
-                        <LineChart data={chartData}>
-                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                          <XAxis dataKey="name" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                          <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                          <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }} />
-                          <Line type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} />
-                        </LineChart>
-                      ) : (
-                        <PieChart>
-                          <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120} label={({ name, value }) => `${name}: ${value}`} labelLine>
-                            {chartData.map((_, i) => (
-                              <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }} />
-                          <Legend />
-                        </PieChart>
-                      )}
-                    </ResponsiveContainer>
-                  </div>
+                    {/* Chart */}
+                    {chartData.length > 0 && (
+                      <div className="h-[350px] mt-2">
+                        <ResponsiveContainer width="100%" height="100%">
+                          {chartType === "bar" ? (
+                            <BarChart data={chartData}>
+                              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                              <XAxis dataKey="name" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                              <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }} />
+                              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                {chartData.map((_, i) => (<Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />))}
+                              </Bar>
+                            </BarChart>
+                          ) : chartType === "line" ? (
+                            <LineChart data={chartData}>
+                              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                              <XAxis dataKey="name" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                              <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }} />
+                              <Line type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} />
+                            </LineChart>
+                          ) : (
+                            <PieChart>
+                              <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120} label={({ name, value }) => `${name}: ${value}`} labelLine>
+                                {chartData.map((_, i) => (<Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />))}
+                              </Pie>
+                              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }} />
+                              <Legend />
+                            </PieChart>
+                          )}
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
