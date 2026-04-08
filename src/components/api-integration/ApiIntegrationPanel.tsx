@@ -14,7 +14,9 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  Download,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import {
   BarChart,
   Bar,
@@ -125,6 +127,41 @@ function formatCellValue(val: string | number, format?: ColumnFormat): string {
     default:
       return typeof val === "number" ? val.toLocaleString("uk-UA") : String(val);
   }
+}
+
+function exportToXlsx(rows: MultiFieldRow[], cols: ColumnConfig[]) {
+  const headers = cols.map((col) =>
+    col.role === "value" && col.aggregation
+      ? `${col.aggregation}(${col.field})`
+      : col.field,
+  );
+
+  const data = rows.map((row) =>
+    cols.map((col) => {
+      const val = row.cells[col.field];
+      if (col.format === "date" && val) {
+        const d = new Date(String(val));
+        return isNaN(d.getTime()) ? val : d;
+      }
+      return val ?? "";
+    }),
+  );
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+
+  // Auto-width columns
+  ws["!cols"] = headers.map((h, i) => {
+    let max = h.length;
+    for (const row of data) {
+      const len = String(row[i] ?? "").length;
+      if (len > max) max = len;
+    }
+    return { wch: Math.min(max + 2, 40) };
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Data");
+  XLSX.writeFile(wb, `export-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 function VirtualTable({
@@ -811,10 +848,22 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
                       </SelectContent>
                     </Select>
                     {chartType === "table" && (
-                      <Button size="sm" variant="outline" onClick={addColumn} disabled={columns.length >= 5}>
-                        <Plus className="size-3.5 mr-1.5" />
-                        Поле ({columns.length}/5)
-                      </Button>
+                      <>
+                        <Button size="sm" variant="outline" onClick={addColumn} disabled={columns.length >= 5}>
+                          <Plus className="size-3.5 mr-1.5" />
+                          Поле ({columns.length}/5)
+                        </Button>
+                        {resultRows.length > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => exportToXlsx(resultRows, columns.filter((c) => c.field))}
+                          >
+                            <Download className="size-3.5 mr-1.5" />
+                            .XLSX
+                          </Button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
