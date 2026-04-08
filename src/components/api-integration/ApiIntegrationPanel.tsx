@@ -332,6 +332,7 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
   const [formPerPage, setFormPerPage] = useState("50");
   const [formAuthHeader, setFormAuthHeader] = useState("Authorization");
   const [formAuthPrefix, setFormAuthPrefix] = useState("Bearer ");
+  const [formUsePagination, setFormUsePagination] = useState(true);
   const [saving, setSaving] = useState(false);
 
   // Sync state
@@ -538,6 +539,7 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
     setFormPerPage(String(intg.per_page));
     setFormAuthHeader(intg.auth_header);
     setFormAuthPrefix(intg.auth_prefix);
+    setFormUsePagination(!!intg.pagination_param);
     setDialogOpen(true);
   };
 
@@ -550,9 +552,9 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
       name: formName.trim(),
       api_token: formToken.trim(),
       api_url: formUrl.trim(),
-      pagination_param: formPaginationParam.trim() || "page",
-      per_page_param: formPerPageParam.trim() || "limit",
-      per_page: parseInt(formPerPage) || 50,
+      pagination_param: formUsePagination ? (formPaginationParam.trim() || "page") : "",
+      per_page_param: formUsePagination ? (formPerPageParam.trim() || "limit") : "",
+      per_page: formUsePagination ? (parseInt(formPerPage) || 50) : 0,
       auth_header: formAuthHeader.trim() || "Authorization",
       auth_prefix: formAuthPrefix,
     };
@@ -579,6 +581,7 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
     setFormPerPage("50");
     setFormAuthHeader("Authorization");
     setFormAuthPrefix("Bearer ");
+    setFormUsePagination(true);
   };
 
   // Delete integration
@@ -592,6 +595,40 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
       await supabase.from("api_integrations").delete().eq("id", id);
       if (selectedId === id) setSelectedId(null);
       await loadIntegrations();
+    });
+  };
+
+  // Sync dialog
+  const [syncDialog, setSyncDialog] = useState<{ type: "confirm" | "cooldown"; message: string; integrationId: string } | null>(null);
+
+  const SYNC_COOLDOWN_MS = 3 * 60 * 60 * 1000; // 3 hours
+
+  const handleSyncClick = (integrationId: string) => {
+    const intg = integrations.find((i) => i.id === integrationId);
+    if (!intg) return;
+
+    if (intg.last_synced_at) {
+      const lastSync = new Date(intg.last_synced_at).getTime();
+      const nextAllowed = lastSync + SYNC_COOLDOWN_MS;
+      const now = Date.now();
+
+      if (now < nextAllowed) {
+        const nextDate = new Date(nextAllowed);
+        const hh = String(nextDate.getHours()).padStart(2, "0");
+        const mm = String(nextDate.getMinutes()).padStart(2, "0");
+        setSyncDialog({
+          type: "cooldown",
+          message: `Синхронізація можлива після ${hh}:${mm}. Зачекайте будь ласка.`,
+          integrationId,
+        });
+        return;
+      }
+    }
+
+    setSyncDialog({
+      type: "confirm",
+      message: "Оновити всі дані? Це перезапише поточні записи новими даними з API.",
+      integrationId,
     });
   };
 
@@ -761,7 +798,7 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedId(intg.id);
-                          setTimeout(() => handleSyncFor(intg.id), 0);
+                          handleSyncClick(intg.id);
                         }}
                       >
                         {syncing && selectedId === intg.id ? (
@@ -1090,83 +1127,99 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
             <DialogTitle>{editingId ? "Редагувати сервіс" : "Додати API сервіс"}</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-xs">Назва сервісу *</Label>
+              <Label className="text-sm">Назва сервісу *</Label>
               <Input
-                placeholder="KeyCRM"
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs">API Токен *</Label>
+              <Label className="text-sm">API Токен *</Label>
               <Input
                 type="password"
-                placeholder="Ваш API ключ"
                 value={formToken}
                 onChange={(e) => setFormToken(e.target.value)}
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs">API URL *</Label>
+              <Label className="text-sm">API URL *</Label>
               <Input
-                placeholder="https://openapi.keycrm.app/v1/orders"
                 value={formUrl}
                 onChange={(e) => setFormUrl(e.target.value)}
               />
             </div>
 
-            <Separator />
-            <p className="text-xs text-muted-foreground font-medium">
-              Налаштування пагінації та авторизації
-            </p>
-
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs">Параметр сторінки</Label>
+                <Label className="text-sm">Auth Header</Label>
                 <Input
-                  placeholder="page"
-                  value={formPaginationParam}
-                  onChange={(e) => setFormPaginationParam(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Параметр ліміту</Label>
-                <Input
-                  placeholder="limit"
-                  value={formPerPageParam}
-                  onChange={(e) => setFormPerPageParam(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Записів на сторінку</Label>
-                <Input
-                  type="number"
-                  value={formPerPage}
-                  onChange={(e) => setFormPerPage(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Auth Header</Label>
-                <Input
-                  placeholder="Authorization"
                   value={formAuthHeader}
                   onChange={(e) => setFormAuthHeader(e.target.value)}
                 />
               </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm">Auth Prefix</Label>
+                <Input
+                  value={formAuthPrefix}
+                  onChange={(e) => setFormAuthPrefix(e.target.value)}
+                />
+              </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-xs">Auth Prefix</Label>
-              <Input
-                placeholder="Bearer "
-                value={formAuthPrefix}
-                onChange={(e) => setFormAuthPrefix(e.target.value)}
-              />
+            <Separator />
+
+            {/* Pagination toggle */}
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Пагінація</Label>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={formUsePagination}
+                onClick={() => setFormUsePagination(!formUsePagination)}
+                className={cn(
+                  "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
+                  formUsePagination ? "bg-primary" : "bg-muted",
+                )}
+              >
+                <span
+                  className={cn(
+                    "pointer-events-none block size-4 rounded-full bg-background shadow-lg ring-0 transition-transform",
+                    formUsePagination ? "translate-x-4" : "translate-x-0",
+                  )}
+                />
+              </button>
             </div>
+
+            {formUsePagination && (
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Параметр сторінки</Label>
+                  <Input
+                    value={formPaginationParam}
+                    onChange={(e) => setFormPaginationParam(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Параметр ліміту</Label>
+                  <Input
+                    value={formPerPageParam}
+                    onChange={(e) => setFormPerPageParam(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Записів на сторінку</Label>
+                  <Input
+                    type="number"
+                    value={formPerPage}
+                    onChange={(e) => setFormPerPage(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter>
@@ -1188,6 +1241,44 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
               {saving && <Loader2 className="size-3.5 mr-1.5 animate-spin" />}
               {editingId ? "Зберегти" : "Додати"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Sync Dialog (cooldown / confirm) ─── */}
+      <Dialog open={!!syncDialog} onOpenChange={(open) => { if (!open) setSyncDialog(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {syncDialog?.type === "cooldown" ? "Синхронізація недоступна" : "Підтвердження синхронізації"}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {syncDialog?.message}
+          </p>
+          <DialogFooter>
+            {syncDialog?.type === "cooldown" ? (
+              <Button size="sm" variant="outline" onClick={() => setSyncDialog(null)}>
+                Зрозуміло
+              </Button>
+            ) : (
+              <>
+                <Button size="sm" variant="outline" onClick={() => setSyncDialog(null)}>
+                  Скасувати
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const id = syncDialog!.integrationId;
+                    setSyncDialog(null);
+                    handleSyncFor(id);
+                  }}
+                >
+                  <RefreshCw className="size-3.5 mr-1.5" />
+                  Синхронізувати
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

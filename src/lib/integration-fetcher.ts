@@ -24,6 +24,7 @@ export async function fetchAllPages(
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Not authenticated");
 
+  const usePagination = !!integration.pagination_param;
   const allRecords: Record<string, unknown>[] = [];
   let page = 1;
   let firstPageSize = 0;
@@ -31,10 +32,11 @@ export async function fetchAllPages(
   while (true) {
     if (signal?.aborted) break;
 
-    // Build the target URL with pagination params
     const targetUrl = new URL(integration.api_url);
-    targetUrl.searchParams.set(integration.pagination_param, String(page));
-    targetUrl.searchParams.set(integration.per_page_param, String(integration.per_page));
+    if (usePagination) {
+      targetUrl.searchParams.set(integration.pagination_param, String(page));
+      targetUrl.searchParams.set(integration.per_page_param, String(integration.per_page));
+    }
 
     onProgress?.({ page, recordsFetched: allRecords.length, done: false });
 
@@ -60,7 +62,6 @@ export async function fetchAllPages(
 
     const json = await res.json();
 
-    // Handle: plain array or { data: [...] } wrapper
     const records: Record<string, unknown>[] = Array.isArray(json)
       ? json
       : Array.isArray(json.data)
@@ -69,10 +70,12 @@ export async function fetchAllPages(
 
     if (records.length === 0) break;
 
-    // Remember first page size as the effective per_page
     if (page === 1) firstPageSize = records.length;
 
     allRecords.push(...records);
+
+    // Without pagination — single request only
+    if (!usePagination) break;
 
     // Last page: fewer records than the first page returned
     if (records.length < firstPageSize) break;
