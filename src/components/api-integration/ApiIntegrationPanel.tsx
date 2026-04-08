@@ -88,19 +88,24 @@ interface AggregationPreset {
   chartType: ChartType;
 }
 
-const PRESETS_KEY = "api-integration-presets";
+const PRESETS_KEY_PREFIX = "api-integration-presets-";
 
-function loadPresets(): AggregationPreset[] {
+function presetsKey(integrationId: string) {
+  return `${PRESETS_KEY_PREFIX}${integrationId}`;
+}
+
+function loadPresets(integrationId: string | null): AggregationPreset[] {
+  if (!integrationId) return [];
   try {
-    const raw = localStorage.getItem(PRESETS_KEY);
+    const raw = localStorage.getItem(presetsKey(integrationId));
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 }
 
-function savePresets(presets: AggregationPreset[]) {
-  localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
+function savePresets(integrationId: string, presets: AggregationPreset[]) {
+  localStorage.setItem(presetsKey(integrationId), JSON.stringify(presets));
 }
 
 type ChartType = "bar" | "line" | "pie" | "table";
@@ -343,6 +348,7 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
   // Data & aggregation
   const [records, setRecords] = useState<Record<string, unknown>[]>([]);
   const [fieldNames, setFieldNames] = useState<string[]>([]);
+  const [recordCounts, setRecordCounts] = useState<Record<string, number>>({});
   const [chartType, setChartType] = useState<ChartType>("table");
 
   // Table mode: multi-column (up to 5) with presets
@@ -359,8 +365,8 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
   const [chartValueField, setChartValueField] = useState("");
   const [chartAggregation, setChartAggregation] = useState<AggregationType>("count");
 
-  // Presets
-  const [presets, setPresets] = useState<AggregationPreset[]>(loadPresets);
+  // Presets (scoped per integration)
+  const [presets, setPresets] = useState<AggregationPreset[]>([]);
   const [presetName, setPresetName] = useState("");
   const [showSavePreset, setShowSavePreset] = useState(false);
 
@@ -381,6 +387,25 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
     setLoading(false);
   }, [projectId]);
 
+  const loadAllRecordCounts = useCallback(async (intgs: typeof integrations) => {
+    if (!profile) return;
+    const counts: Record<string, number> = {};
+    await Promise.all(
+      intgs.map(async (intg) => {
+        try {
+          const { data, error } = await supabase.storage
+            .from("integration-data")
+            .download(`${profile.id}/${intg.id}.json`);
+          if (error || !data) return;
+          const text = await data.text();
+          const recs = JSON.parse(text) as unknown[];
+          counts[intg.id] = recs.length;
+        } catch { /* ignore */ }
+      }),
+    );
+    setRecordCounts((prev) => ({ ...prev, ...counts }));
+  }, [profile]);
+
   useEffect(() => {
     setSelectedId(null);
     setColumns([]);
@@ -388,15 +413,47 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
     loadIntegrations();
   }, [loadIntegrations]);
 
-  // Load cached data when selecting an integration
+  // Load record counts for all integrations
   useEffect(() => {
+    if (integrations.length > 0) loadAllRecordCounts(integrations);
+  }, [integrations, loadAllRecordCounts]);
+
+  // Load cached data and reset aggregation when switching integration
+  const prevSelectedId = useRef<string | null>(null);
+  useEffect(() => {
+    const switched = prevSelectedId.current !== selectedId;
+    prevSelectedId.current = selectedId;
+
     if (!selectedId) {
       setRecords([]);
       setFieldNames([]);
       setResultRows([]);
+      setColumns([]);
+      setPresets([]);
+      setChartType("table");
+      setDateField("");
+      setDateFrom("");
+      setDateTo("");
+      setChartGroupBy("");
+      setChartValueField("");
+      setChartAggregation("count");
       return;
     }
-    loadRecords(selectedId);
+
+    if (switched) {
+      // Only reset aggregation state when switching to a different integration
+      setPresets(loadPresets(selectedId));
+      setColumns([]);
+      setResultRows([]);
+      setChartType("table");
+      setDateField("");
+      setDateFrom("");
+      setDateTo("");
+      setChartGroupBy("");
+      setChartValueField("");
+      setChartAggregation("count");
+      loadRecords(selectedId);
+    }
   }, [selectedId]);
 
   const getStoragePath = (integrationId: string) =>
@@ -420,6 +477,7 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
       const text = await data.text();
       const recs = JSON.parse(text) as Record<string, unknown>[];
       setRecords(recs);
+      setRecordCounts((prev) => ({ ...prev, [integrationId]: recs.length }));
       if (recs.length > 0) {
         setFieldNames(extractFieldNames(recs));
       } else {
@@ -482,9 +540,9 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
     setColumns((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  // Preset management
+  // Preset management (scoped per integration)
   const handleSavePreset = () => {
-    if (!presetName.trim() || columns.length === 0) return;
+    if (!presetName.trim() || columns.length === 0 || !selectedId) return;
     const newPreset: AggregationPreset = {
       name: presetName.trim(),
       columns: [...columns],
@@ -492,7 +550,7 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
     };
     const updated = [...presets, newPreset];
     setPresets(updated);
-    savePresets(updated);
+    savePresets(selectedId, updated);
     setPresetName("");
     setShowSavePreset(false);
   };
@@ -503,9 +561,10 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
   };
 
   const deletePreset = (idx: number) => {
+    if (!selectedId) return;
     const updated = presets.filter((_, i) => i !== idx);
     setPresets(updated);
-    savePresets(updated);
+    savePresets(selectedId, updated);
   };
 
   // For charts (bar/line/pie): simple X/Y aggregation
@@ -812,8 +871,8 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
                   <TableCell className="text-xs text-muted-foreground tabular-nums">
                     {selectedId === intg.id && syncing && syncProgress
                       ? `${syncProgress.page}...`
-                      : selectedId === intg.id && records.length > 0
-                        ? records.length.toLocaleString("uk-UA")
+                      : recordCounts[intg.id] != null
+                        ? recordCounts[intg.id].toLocaleString("uk-UA")
                         : "—"}
                   </TableCell>
                   {isAdmin && (
