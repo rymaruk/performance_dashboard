@@ -790,82 +790,81 @@ export function ApiIntegrationPanel({ projectId, isAdmin }: ApiIntegrationPanelP
           {records.length > 0 && fieldNames.length > 0 && (
             <Card>
               <CardContent className="pt-5 space-y-4">
-                {/* Header with type selector */}
+                {/* Row 1: Title | Type select | + Поле */}
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <h3 className="text-sm font-bold">
                     {chartType === "table" ? "Агрегація даних" : "Побудова графіка"}
                   </h3>
-                  <Select
-                    value={chartType}
-                    onValueChange={(v) => setChartType(v as ChartType)}
-                  >
-                    <SelectTrigger className="h-9 text-sm w-[120px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="table" className="text-sm">Таблиця</SelectItem>
-                      <SelectItem value="bar" className="text-sm">Bar</SelectItem>
-                      <SelectItem value="line" className="text-sm">Line</SelectItem>
-                      <SelectItem value="pie" className="text-sm">Pie</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={chartType}
+                      onValueChange={(v) => setChartType(v as ChartType)}
+                    >
+                      <SelectTrigger className="h-9 text-sm w-[120px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="table" className="text-sm">Таблиця</SelectItem>
+                        <SelectItem value="bar" className="text-sm">Bar</SelectItem>
+                        <SelectItem value="line" className="text-sm">Line</SelectItem>
+                        <SelectItem value="pie" className="text-sm">Pie</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {chartType === "table" && (
+                      <Button size="sm" variant="outline" onClick={addColumn} disabled={columns.length >= 5}>
+                        <Plus className="size-3.5 mr-1.5" />
+                        Поле ({columns.length}/5)
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 {/* ═══ TABLE MODE: multi-column + presets ═══ */}
                 {chartType === "table" && (
                   <>
-                    {/* Presets + Add column */}
-                    <div className="flex items-center justify-between flex-wrap gap-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {presets.length > 0 && (
-                          <>
-                            <span className="text-xs text-muted-foreground">Пресети:</span>
-                            {presets.map((p, i) => (
-                              <button
-                                key={i}
-                                className="inline-flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-xs hover:bg-muted/80 transition-colors"
-                                onClick={() => applyPreset(p)}
-                              >
-                                {p.name}
-                                <X
-                                  className="size-3 text-muted-foreground hover:text-destructive cursor-pointer"
-                                  onClick={(e) => { e.stopPropagation(); deletePreset(i); }}
-                                />
-                              </button>
-                            ))}
-                          </>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {columns.length > 0 && !showSavePreset && (
-                          <Button size="sm" variant="ghost" onClick={() => setShowSavePreset(true)}>
-                            <Save className="size-3.5 mr-1.5" />
-                            Зберегти
-                          </Button>
-                        )}
-                        {showSavePreset && (
-                          <div className="flex items-center gap-1.5">
-                            <Input
-                              className="h-9 text-sm w-[150px]"
-                              placeholder="Назва пресету"
-                              value={presetName}
-                              onChange={(e) => setPresetName(e.target.value)}
-                              onKeyDown={(e) => e.key === "Enter" && handleSavePreset()}
-                              autoFocus
-                            />
-                            <Button size="sm" variant="default" onClick={handleSavePreset} disabled={!presetName.trim()}>
-                              <Save className="size-3.5" />
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => { setShowSavePreset(false); setPresetName(""); }}>
-                              <X className="size-3.5" />
-                            </Button>
-                          </div>
-                        )}
-                        <Button size="sm" variant="outline" onClick={addColumn} disabled={columns.length >= 5}>
-                          <Plus className="size-3.5 mr-1.5" />
-                          Поле ({columns.length}/5)
+                    {/* Row 2: Presets + Save */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-muted-foreground">Пресети:</span>
+                      {presets.map((p, i) => (
+                        <button
+                          key={i}
+                          className="inline-flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-xs hover:bg-muted/80 transition-colors"
+                          onClick={() => applyPreset(p)}
+                        >
+                          {p.name}
+                          <X
+                            className="size-3 text-muted-foreground hover:text-destructive cursor-pointer"
+                            onClick={(e) => { e.stopPropagation(); deletePreset(i); }}
+                          />
+                        </button>
+                      ))}
+                      {presets.length === 0 && (
+                        <span className="text-xs text-muted-foreground/60">немає збережених</span>
+                      )}
+                      {columns.length > 0 && !showSavePreset && (
+                        <Button size="sm" variant="ghost" onClick={() => setShowSavePreset(true)}>
+                          <Save className="size-3.5 mr-1.5" />
+                          Зберегти
                         </Button>
-                      </div>
+                      )}
+                      {showSavePreset && (
+                        <div className="flex items-center gap-1.5">
+                          <Input
+                            className="h-9 text-sm w-[150px]"
+                            placeholder="Назва пресету"
+                            value={presetName}
+                            onChange={(e) => setPresetName(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleSavePreset()}
+                            autoFocus
+                          />
+                          <Button size="sm" variant="default" onClick={handleSavePreset} disabled={!presetName.trim()}>
+                            <Save className="size-3.5" />
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => { setShowSavePreset(false); setPresetName(""); }}>
+                            <X className="size-3.5" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Date filter */}
