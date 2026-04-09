@@ -25,7 +25,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "../ui/hover-card";
-import { useConfirmAction } from "../../hooks/ConfirmContext";
+import { DeleteProjectModal } from "./DeleteProjectModal";
 import { getAccentDef } from "../../constants";
 import type { AccentColor } from "../../constants";
 import { FolderOpen, Pencil, Plus, Trash2 } from "lucide-react";
@@ -51,9 +51,9 @@ export function ProjectBar({
   onAddProject,
   isAdmin = true,
 }: ProjectBarProps) {
-  const confirm = useConfirmAction();
   const proj = projects.find((p) => p.id === activeProjectId);
   const [open, setOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editColor, setEditColor] = useState<AccentColor | string>("sky");
@@ -200,10 +200,7 @@ export function ProjectBar({
                   className="mr-auto"
                   onClick={() => {
                     setOpen(false);
-                    confirm(
-                      `Видалити проект «${proj.name || "без назви"}»?`,
-                      onDelete,
-                    );
+                    setDeleteModalOpen(true);
                   }}
                 >
                   <Trash2 className="size-3.5" /> Видалити
@@ -218,6 +215,18 @@ export function ProjectBar({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      )}
+
+      {proj && (
+        <DeleteProjectModal
+          open={deleteModalOpen}
+          onOpenChange={setDeleteModalOpen}
+          projectName={proj.name || "без назви"}
+          onConfirmDelete={() => {
+            setDeleteModalOpen(false);
+            onDelete();
+          }}
+        />
       )}
     </div>
   );
