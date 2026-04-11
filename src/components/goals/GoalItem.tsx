@@ -44,7 +44,7 @@ import {
   ChevronDown,
   ClipboardList,
 } from "lucide-react";
-import type { Goal, KPI, KpiDefinition, Task, Team, UserProfile } from "../../types";
+import type { Goal, KPI, KpiDefinition, KpiValueHistory, Task, Team, UserProfile } from "../../types";
 import type { AccentColor } from "../../constants";
 
 interface GoalItemProps {
@@ -68,7 +68,7 @@ interface GoalItemProps {
   onAddLink: (tid: string) => void;
   onRemoveLink: (tid: string, lid: string) => void;
   onUpdateLink: (tid: string, lid: string, lk: Task["links"][0]) => void;
-  kpiHistoryRevision?: number;
+  kpiLastChanges?: Record<string, KpiValueHistory>;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -107,7 +107,7 @@ export function GoalItem({
   onAddLink,
   onRemoveLink,
   onUpdateLink,
-  kpiHistoryRevision,
+  kpiLastChanges,
 }: GoalItemProps) {
   const confirm = useConfirmAction();
   const ac = getAccentDef(g.color);
@@ -349,7 +349,7 @@ export function GoalItem({
           onAdd={onAddKPI}
           onRemove={onRemoveKPI}
           onUpdate={onUpdateKPI}
-          kpiHistoryRevision={kpiHistoryRevision}
+          kpiLastChanges={kpiLastChanges}
         />
 
         <div>

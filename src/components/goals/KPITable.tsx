@@ -26,7 +26,7 @@ import { KpiEditDialog } from "../kpi/KpiEditDialog";
 import { KpiHistoryDialog } from "../kpi/KpiHistoryDialog";
 import { KpiLastChange } from "../kpi/KpiLastChange";
 import { X, BarChart3, Plus, TrendingUp, TrendingDown } from "lucide-react";
-import type { KPI, KpiDefinition } from "../../types";
+import type { KPI, KpiDefinition, KpiValueHistory } from "../../types";
 
 interface KPITableProps {
   goalId: string;
@@ -38,7 +38,7 @@ interface KPITableProps {
   onAdd: (kpiDefId: string) => void;
   onRemove: (kid: string) => void;
   onUpdate: (kid: string, fn: (k: KPI) => KPI, comment?: string) => void;
-  kpiHistoryRevision?: number;
+  kpiLastChanges?: Record<string, KpiValueHistory>;
 }
 
 export function KPITable({
@@ -49,7 +49,7 @@ export function KPITable({
   onAdd,
   onRemove,
   onUpdate,
-  kpiHistoryRevision,
+  kpiLastChanges,
 }: KPITableProps) {
   const confirm = useConfirmAction();
 
@@ -214,7 +214,7 @@ export function KPITable({
                 </span>
               </div>
 
-              <KpiLastChange goalKpiId={k.id} revision={kpiHistoryRevision} />
+              <KpiLastChange goalKpiId={k.id} optimistic={kpiLastChanges?.[k.id]} />
               <KpiHistoryDialog kpi={k} />
             </div>
           );

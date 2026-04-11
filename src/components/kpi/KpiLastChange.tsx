@@ -1,14 +1,15 @@
 import { medDate } from "../../utils/date";
 import { fmtNum } from "../../utils/format";
 import { useKpiLastChange } from "../../hooks/useKpiLastChange";
+import type { KpiValueHistory } from "../../types";
 
 interface KpiLastChangeProps {
   goalKpiId: string;
-  revision?: number;
+  optimistic?: KpiValueHistory | null;
 }
 
-export function KpiLastChange({ goalKpiId, revision }: KpiLastChangeProps) {
-  const { last } = useKpiLastChange(goalKpiId, revision);
+export function KpiLastChange({ goalKpiId, optimistic }: KpiLastChangeProps) {
+  const { last } = useKpiLastChange(goalKpiId, optimistic);
 
   if (!last) return null;
 

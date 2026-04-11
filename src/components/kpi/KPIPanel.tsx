@@ -30,19 +30,19 @@ import { goalPeriodOverlapsFilter, medDate, today, addDays } from "../../utils/d
 import { fmtNum } from "../../utils/format";
 import { getAccentDef } from "../../constants";
 import { BarChart3, FilterX, TrendingDown, TrendingUp, X } from "lucide-react";
-import type { Goal, KPI, Project, Team } from "../../types";
+import type { Goal, KPI, KpiValueHistory, Project, Team } from "../../types";
 
 interface KPIPanelProps {
   proj: Project;
   teams: Team[];
   onUpdateKPI: (gid: string, kid: string, fn: (k: KPI) => KPI, comment?: string) => void;
-  kpiHistoryRevision?: number;
+  kpiLastChanges?: Record<string, KpiValueHistory>;
 }
 
 const kpiCardToneClass =
   "*:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs dark:*:data-[slot=card]:bg-card";
 
-export function KPIPanel({ proj, teams, onUpdateKPI, kpiHistoryRevision }: KPIPanelProps) {
+export function KPIPanel({ proj, teams, onUpdateKPI, kpiLastChanges }: KPIPanelProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const filterTeam = searchParams.get("team");
   const filterPeriodFrom = searchParams.get("from");
@@ -287,7 +287,7 @@ export function KPIPanel({ proj, teams, onUpdateKPI, kpiHistoryRevision }: KPIPa
                               </Badge>
                             </div>
                             <div className="flex items-center justify-between gap-2 w-full">
-                              <KpiDiffBadge goalKpiId={k.id} revision={kpiHistoryRevision} />
+                              <KpiDiffBadge goalKpiId={k.id} optimistic={kpiLastChanges?.[k.id]} />
                               <div className="line-clamp-1 flex items-center gap-2 font-medium text-xs">
                                 {pct >= 100
                                   ? "Ціль досягнуто"
@@ -300,7 +300,7 @@ export function KPIPanel({ proj, teams, onUpdateKPI, kpiHistoryRevision }: KPIPa
                           </CardContent>
                           <CardFooter className="flex flex-col items-start gap-2 text-sm">
                             
-                            <KpiLastChange goalKpiId={k.id} revision={kpiHistoryRevision} />
+                            <KpiLastChange goalKpiId={k.id} optimistic={kpiLastChanges?.[k.id]} />
                             <KpiHistoryDialog kpi={k} />
                           </CardFooter>
                         </Card>

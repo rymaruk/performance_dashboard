@@ -18,7 +18,7 @@ import { goalPeriodOverlapsFilter, today, addDays } from "../../utils/date";
 import { DateRangePicker } from "../ui/DateRangePicker";
 import { Label } from "../ui/label";
 import { AlertTriangle, FilterX, Plus, X, Target } from "lucide-react";
-import type { Goal, KPI, KpiDefinition, Task, Project, Team, UserProfile } from "../../types";
+import type { Goal, KPI, KpiDefinition, KpiValueHistory, Task, Project, Team, UserProfile } from "../../types";
 
 interface GoalsProps {
   proj: Project;
@@ -43,7 +43,7 @@ interface GoalsProps {
   onAddLink: (gid: string, tid: string) => void;
   onRemoveLink: (gid: string, tid: string, lid: string) => void;
   onUpdateLink: (gid: string, tid: string, lid: string, lk: Task["links"][0]) => void;
-  kpiHistoryRevision?: number;
+  kpiLastChanges?: Record<string, KpiValueHistory>;
 }
 
 export function Goals({
@@ -69,7 +69,7 @@ export function Goals({
   onAddLink,
   onRemoveLink,
   onUpdateLink,
-  kpiHistoryRevision,
+  kpiLastChanges,
 }: GoalsProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const filterTeam = searchParams.get("team");
@@ -334,7 +334,7 @@ export function Goals({
               onAddLink={(tid) => onAddLink(g.id, tid)}
               onRemoveLink={(tid, lid) => onRemoveLink(g.id, tid, lid)}
               onUpdateLink={(tid, lid, lk) => onUpdateLink(g.id, tid, lid, lk)}
-              kpiHistoryRevision={kpiHistoryRevision}
+              kpiLastChanges={kpiLastChanges}
             />
           ))}
         </Accordion>

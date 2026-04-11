@@ -19,6 +19,7 @@ import type {
   ProjectRow,
   Team,
   UserProfile,
+  KpiValueHistory,
 } from "../types";
 import type { Role, Priority, GoalStatus, TaskStatus } from "../types";
 
@@ -105,7 +106,7 @@ export function useProject(activeProjectId: string) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamUsers, setTeamUsers] = useState<Record<string, UserProfile[]>>({});
   const [loading, setLoading] = useState(true);
-  const [kpiHistoryRevision, setKpiHistoryRevision] = useState(0);
+  const [kpiLastChanges, setKpiLastChanges] = useState<Record<string, KpiValueHistory>>({});
 
   const loadTeamUsers = useCallback(async (teamIds: string[]) => {
     const uniqueIds = [...new Set(teamIds.filter(Boolean))];
@@ -710,18 +711,32 @@ export function useProject(activeProjectId: string) {
 
       // Insert history record if current value changed and comment provided
       if (comment !== undefined && u.current !== oldCurrent) {
-        const { error: histErr } = await supabase.from("kpi_value_history").insert({
+        const userName = profile
+          ? `${profile.first_name} ${profile.last_name}`
+          : "";
+        const historyPayload = {
           goal_kpi_id: kid,
           old_value: oldCurrent,
           new_value: u.current,
           comment: comment || "",
           user_id: profile?.id ?? null,
-          user_name: profile
-            ? `${profile.first_name} ${profile.last_name}`
-            : "",
-        });
+          user_name: userName,
+        };
+
+        // Optimistic update — components see new data instantly
+        setKpiLastChanges((prev) => ({
+          ...prev,
+          [kid]: {
+            id: crypto.randomUUID(),
+            ...historyPayload,
+            created_at: new Date().toISOString(),
+          },
+        }));
+
+        const { error: histErr } = await supabase
+          .from("kpi_value_history")
+          .insert(historyPayload);
         if (histErr) console.error("kpi_value_history insert failed:", histErr);
-        else setKpiHistoryRevision((r) => r + 1);
       }
     }
   };
@@ -797,6 +812,6 @@ export function useProject(activeProjectId: string) {
     updateLink,
     loading,
     reloadProjects: loadProjects,
-    kpiHistoryRevision,
+    kpiLastChanges,
   };
 }

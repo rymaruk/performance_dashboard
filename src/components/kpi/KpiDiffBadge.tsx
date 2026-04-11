@@ -2,14 +2,15 @@ import { cn } from "@/lib/utils";
 import { fmtNum } from "../../utils/format";
 import { useKpiLastChange } from "../../hooks/useKpiLastChange";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
+import type { KpiValueHistory } from "../../types";
 
 interface KpiDiffBadgeProps {
   goalKpiId: string;
-  revision?: number;
+  optimistic?: KpiValueHistory | null;
 }
 
-export function KpiDiffBadge({ goalKpiId, revision }: KpiDiffBadgeProps) {
-  const { last, diff } = useKpiLastChange(goalKpiId, revision);
+export function KpiDiffBadge({ goalKpiId, optimistic }: KpiDiffBadgeProps) {
+  const { last, diff } = useKpiLastChange(goalKpiId, optimistic);
 
   if (diff === null || diff === 0 || !last) return null;
 
