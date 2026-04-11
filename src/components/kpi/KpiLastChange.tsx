@@ -4,10 +4,11 @@ import { useKpiLastChange } from "../../hooks/useKpiLastChange";
 
 interface KpiLastChangeProps {
   goalKpiId: string;
+  revision?: number;
 }
 
-export function KpiLastChange({ goalKpiId }: KpiLastChangeProps) {
-  const { last } = useKpiLastChange(goalKpiId);
+export function KpiLastChange({ goalKpiId, revision }: KpiLastChangeProps) {
+  const { last } = useKpiLastChange(goalKpiId, revision);
 
   if (!last) return null;
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import type { KpiValueHistory } from "../types";
 
-export function useKpiLastChange(goalKpiId: string) {
+export function useKpiLastChange(goalKpiId: string, revision?: number) {
   const [last, setLast] = useState<KpiValueHistory | null>(null);
 
   useEffect(() => {
@@ -19,7 +19,7 @@ export function useKpiLastChange(goalKpiId: string) {
         }
       });
     return () => { cancelled = true; };
-  }, [goalKpiId]);
+  }, [goalKpiId, revision]);
 
   const diff = last ? last.new_value - last.old_value : null;
 

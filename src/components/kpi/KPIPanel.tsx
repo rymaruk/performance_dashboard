@@ -36,12 +36,13 @@ interface KPIPanelProps {
   proj: Project;
   teams: Team[];
   onUpdateKPI: (gid: string, kid: string, fn: (k: KPI) => KPI, comment?: string) => void;
+  kpiHistoryRevision?: number;
 }
 
 const kpiCardToneClass =
   "*:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs dark:*:data-[slot=card]:bg-card";
 
-export function KPIPanel({ proj, teams, onUpdateKPI }: KPIPanelProps) {
+export function KPIPanel({ proj, teams, onUpdateKPI, kpiHistoryRevision }: KPIPanelProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const filterTeam = searchParams.get("team");
   const filterPeriodFrom = searchParams.get("from");
@@ -286,7 +287,7 @@ export function KPIPanel({ proj, teams, onUpdateKPI }: KPIPanelProps) {
                               </Badge>
                             </div>
                             <div className="flex items-center justify-between gap-2 w-full">
-                              <KpiDiffBadge goalKpiId={k.id} />
+                              <KpiDiffBadge goalKpiId={k.id} revision={kpiHistoryRevision} />
                               <div className="line-clamp-1 flex items-center gap-2 font-medium text-xs">
                                 {pct >= 100
                                   ? "Ціль досягнуто"
@@ -299,7 +300,7 @@ export function KPIPanel({ proj, teams, onUpdateKPI }: KPIPanelProps) {
                           </CardContent>
                           <CardFooter className="flex flex-col items-start gap-2 text-sm">
                             
-                            <KpiLastChange goalKpiId={k.id} />
+                            <KpiLastChange goalKpiId={k.id} revision={kpiHistoryRevision} />
                             <KpiHistoryDialog kpi={k} />
                           </CardFooter>
                         </Card>

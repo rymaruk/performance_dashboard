@@ -38,6 +38,7 @@ interface KPITableProps {
   onAdd: (kpiDefId: string) => void;
   onRemove: (kid: string) => void;
   onUpdate: (kid: string, fn: (k: KPI) => KPI, comment?: string) => void;
+  kpiHistoryRevision?: number;
 }
 
 export function KPITable({
@@ -48,6 +49,7 @@ export function KPITable({
   onAdd,
   onRemove,
   onUpdate,
+  kpiHistoryRevision,
 }: KPITableProps) {
   const confirm = useConfirmAction();
 
@@ -212,7 +214,7 @@ export function KPITable({
                 </span>
               </div>
 
-              <KpiLastChange goalKpiId={k.id} />
+              <KpiLastChange goalKpiId={k.id} revision={kpiHistoryRevision} />
               <KpiHistoryDialog kpi={k} />
             </div>
           );

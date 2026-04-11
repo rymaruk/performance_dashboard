@@ -43,6 +43,7 @@ interface GoalsProps {
   onAddLink: (gid: string, tid: string) => void;
   onRemoveLink: (gid: string, tid: string, lid: string) => void;
   onUpdateLink: (gid: string, tid: string, lid: string, lk: Task["links"][0]) => void;
+  kpiHistoryRevision?: number;
 }
 
 export function Goals({
@@ -68,6 +69,7 @@ export function Goals({
   onAddLink,
   onRemoveLink,
   onUpdateLink,
+  kpiHistoryRevision,
 }: GoalsProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const filterTeam = searchParams.get("team");
@@ -332,6 +334,7 @@ export function Goals({
               onAddLink={(tid) => onAddLink(g.id, tid)}
               onRemoveLink={(tid, lid) => onRemoveLink(g.id, tid, lid)}
               onUpdateLink={(tid, lid, lk) => onUpdateLink(g.id, tid, lid, lk)}
+              kpiHistoryRevision={kpiHistoryRevision}
             />
           ))}
         </Accordion>

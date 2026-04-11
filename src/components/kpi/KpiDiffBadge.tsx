@@ -5,10 +5,11 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 
 interface KpiDiffBadgeProps {
   goalKpiId: string;
+  revision?: number;
 }
 
-export function KpiDiffBadge({ goalKpiId }: KpiDiffBadgeProps) {
-  const { last, diff } = useKpiLastChange(goalKpiId);
+export function KpiDiffBadge({ goalKpiId, revision }: KpiDiffBadgeProps) {
+  const { last, diff } = useKpiLastChange(goalKpiId, revision);
 
   if (diff === null || diff === 0 || !last) return null;
 

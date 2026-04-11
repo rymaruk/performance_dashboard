@@ -68,6 +68,7 @@ interface GoalItemProps {
   onAddLink: (tid: string) => void;
   onRemoveLink: (tid: string, lid: string) => void;
   onUpdateLink: (tid: string, lid: string, lk: Task["links"][0]) => void;
+  kpiHistoryRevision?: number;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -106,6 +107,7 @@ export function GoalItem({
   onAddLink,
   onRemoveLink,
   onUpdateLink,
+  kpiHistoryRevision,
 }: GoalItemProps) {
   const confirm = useConfirmAction();
   const ac = getAccentDef(g.color);
@@ -347,6 +349,7 @@ export function GoalItem({
           onAdd={onAddKPI}
           onRemove={onRemoveKPI}
           onUpdate={onUpdateKPI}
+          kpiHistoryRevision={kpiHistoryRevision}
         />
 
         <div>

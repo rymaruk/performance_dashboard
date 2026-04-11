@@ -105,6 +105,7 @@ export function useProject(activeProjectId: string) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamUsers, setTeamUsers] = useState<Record<string, UserProfile[]>>({});
   const [loading, setLoading] = useState(true);
+  const [kpiHistoryRevision, setKpiHistoryRevision] = useState(0);
 
   const loadTeamUsers = useCallback(async (teamIds: string[]) => {
     const uniqueIds = [...new Set(teamIds.filter(Boolean))];
@@ -720,6 +721,7 @@ export function useProject(activeProjectId: string) {
             : "",
         });
         if (histErr) console.error("kpi_value_history insert failed:", histErr);
+        else setKpiHistoryRevision((r) => r + 1);
       }
     }
   };
@@ -795,5 +797,6 @@ export function useProject(activeProjectId: string) {
     updateLink,
     loading,
     reloadProjects: loadProjects,
+    kpiHistoryRevision,
   };
 }

@@ -76,6 +76,7 @@ export function DashboardLayout() {
     updateLink,
     kpiDefinitions,
     loading,
+    kpiHistoryRevision,
   } = useProject(urlProjectId ?? "");
 
   // Redirect logic: fix URL when projectId or tab is missing/invalid
@@ -187,11 +188,12 @@ export function DashboardLayout() {
               onAddLink={addLink}
               onRemoveLink={removeLink}
               onUpdateLink={updateLink}
+              kpiHistoryRevision={kpiHistoryRevision}
             />
           )}
 
           {tab === "kpi" && (
-            <KPIPanel proj={proj} teams={teams} onUpdateKPI={updateKPI} />
+            <KPIPanel proj={proj} teams={teams} onUpdateKPI={updateKPI} kpiHistoryRevision={kpiHistoryRevision} />
           )}
 
           {tab === "gantt" && (
