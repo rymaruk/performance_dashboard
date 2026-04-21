@@ -114,9 +114,10 @@ export function GoalItem({
 
   return (
     <AccordionItem
+      id={`goal-${g.id}`}
       value={g.id}
       className={cn(
-        "bg-card rounded-lg mt-2 shadow-sm border-l-4 border overflow-hidden",
+        "bg-card rounded-lg mt-2 shadow-sm border-l-4 border overflow-hidden scroll-mt-24",
         ac.border,
       )}
     >

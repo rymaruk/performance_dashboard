@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthContext";
 import { today, addDays, diffDays, fmt } from "../utils/date";
@@ -22,6 +22,15 @@ import type {
   KpiValueHistory,
 } from "../types";
 import type { Role, Priority, GoalStatus, TaskStatus } from "../types";
+
+const EMPTY_PROJECT: Project = {
+  id: "",
+  name: "",
+  desc: "",
+  color: null,
+  goals: [],
+  createdAt: 0,
+};
 
 /* ── helpers ── */
 
@@ -107,6 +116,15 @@ export function useProject(activeProjectId: string) {
   const [teamUsers, setTeamUsers] = useState<Record<string, UserProfile[]>>({});
   const [loading, setLoading] = useState(true);
   const [kpiLastChanges, setKpiLastChanges] = useState<Record<string, KpiValueHistory>>({});
+  const isMountedRef = useRef(true);
+  const loadRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const loadTeamUsers = useCallback(async (teamIds: string[]) => {
     const uniqueIds = [...new Set(teamIds.filter(Boolean))];
@@ -116,7 +134,7 @@ export function useProject(activeProjectId: string) {
       .select("*")
       .in("team_id", uniqueIds)
       .order("first_name", { ascending: true });
-    if (!data) return;
+    if (!data || !isMountedRef.current) return;
     const map: Record<string, UserProfile[]> = {};
     for (const u of data as UserProfile[]) {
       const tid = u.team_id!;
@@ -128,6 +146,12 @@ export function useProject(activeProjectId: string) {
 
   /* ─── Load full project tree from Supabase ─── */
   const loadProjects = useCallback(async () => {
+    const requestId = ++loadRequestIdRef.current;
+    const isStale = () =>
+      !isMountedRef.current || requestId !== loadRequestIdRef.current;
+
+    if (isMountedRef.current) setLoading(true);
+
     const [{ data: kpiDefs }, { data: teamRows }] = await Promise.all([
       supabase
         .from("kpi_definitions")
@@ -138,6 +162,7 @@ export function useProject(activeProjectId: string) {
         .select("*")
         .order("name", { ascending: true }),
     ]);
+    if (isStale()) return;
     setKpiDefinitions((kpiDefs as KpiDefinition[]) ?? []);
     setTeams((teamRows as Team[]) ?? []);
 
@@ -145,6 +170,7 @@ export function useProject(activeProjectId: string) {
       .from("projects")
       .select("*")
       .order("created_at", { ascending: true });
+    if (isStale()) return;
 
     if (!projRows || projRows.length === 0) {
       setProjects([]);
@@ -165,6 +191,7 @@ export function useProject(activeProjectId: string) {
     }
 
     const { data: goalRows } = await goalsQuery;
+    if (isStale()) return;
     const allGoals: GoalRow[] = goalRows ?? [];
     const goalIds = allGoals.map((g) => g.id);
 
@@ -184,6 +211,7 @@ export function useProject(activeProjectId: string) {
           .select("*, kpi_definition:kpi_definitions(*)")
           .in("goal_id", goalIds),
       ]);
+      if (isStale()) return;
       allTasks = tasksRes.data ?? [];
       allGoalKpis = (kpisRes.data as unknown as GoalKpiRow[]) ?? [];
 
@@ -193,6 +221,7 @@ export function useProject(activeProjectId: string) {
           .from("links")
           .select("*")
           .in("task_id", taskIds);
+        if (isStale()) return;
         allLinks = linkRows ?? [];
       }
     }
@@ -254,6 +283,7 @@ export function useProject(activeProjectId: string) {
     const goalTeamIds = allGoals.map((g) => g.team_id).filter(Boolean) as string[];
     if (goalTeamIds.length > 0) {
       await loadTeamUsers(goalTeamIds);
+      if (isStale()) return;
     }
 
     setProjects(loaded);
@@ -267,14 +297,8 @@ export function useProject(activeProjectId: string) {
   const proj = useMemo(
     () =>
       projects.find((p) => p.id === activeProjectId) ??
-      projects[0] ?? {
-        id: "",
-        name: "",
-        desc: "",
-        color: null,
-        goals: [],
-        createdAt: Date.now(),
-      },
+      projects[0] ??
+      EMPTY_PROJECT,
     [projects, activeProjectId],
   );
 
@@ -297,10 +321,14 @@ export function useProject(activeProjectId: string) {
   );
 
   /* ─── UI toggles ─── */
-  const toggleTask = (id: string) =>
-    setExpandedTasks((x) => ({ ...x, [id]: !x[id] }));
-  const toggleGanttGoal = (id: string) =>
-    setGanttExpanded((x) => ({ ...x, [id]: !x[id] }));
+  const toggleTask = useCallback(
+    (id: string) => setExpandedTasks((x) => ({ ...x, [id]: !x[id] })),
+    [],
+  );
+  const toggleGanttGoal = useCallback(
+    (id: string) => setGanttExpanded((x) => ({ ...x, [id]: !x[id] })),
+    [],
+  );
 
   /* ─── Stats ─── */
   const stats: ProjectStats = useMemo(() => {

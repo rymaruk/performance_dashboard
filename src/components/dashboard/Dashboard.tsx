@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { fmtNum } from "../../utils/format";
 import {
   Label,
   PolarAngleAxis,
-  PolarGrid,
   PolarRadiusAxis,
   RadialBar,
   RadialBarChart,
@@ -14,15 +12,7 @@ import { ProgressBar } from "../ui/progress-bar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/accordion";
 import { Badge } from "../ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "../ui/chart";
 import type { ChartConfig } from "../ui/chart";
 import { ColorPicker } from "../ui/color-picker";
@@ -37,12 +27,11 @@ import {
 } from "../ui/item";
 import { ACCENT_COLORS, getAccentDef } from "../../constants";
 import type { AccentColor } from "../../constants";
-import { roleColor } from "../../utils/roleColor";
 import { medDate, diffDays, today } from "../../utils/date";
-import type { Project, ProjectStats, Role, Team } from "../../types";
+import type { Project, ProjectStats, Team } from "../../types";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "../../hooks/AuthContext";
-import { AlertTriangle, BarChart3, Target, Users, TrendingUp } from "lucide-react";
+import { AlertTriangle, BarChart3, TrendingUp } from "lucide-react";
 
 type OverviewAccents = {
   goals: AccentColor;
@@ -89,6 +78,10 @@ export function Dashboard({ proj, stats, teams }: DashboardProps) {
   const navigate = useNavigate();
   const { projectId } = useParams<{ projectId: string }>();
   const { profile, refreshProfile } = useAuth();
+  const goalsPath = projectId ? `/${projectId}/goals` : "/goals";
+  const openGoal = useCallback((goalId: string) => {
+    navigate(`${goalsPath}?id=${encodeURIComponent(goalId)}`);
+  }, [goalsPath, navigate]);
   const teamName = (teamId: string | null | undefined) =>
     teams.find((t) => t.id === teamId)?.name ?? "Без команди";
 
@@ -122,115 +115,170 @@ export function Dashboard({ proj, stats, teams }: DashboardProps) {
     [profile?.id, refreshProfile],
   );
 
-  /** Задачі з усіх цілей, згруповані за командою цілі (не за виконавцем). */
-  const teamStats = useMemo(() => {
-    const map: Record<string, { total: number; done: number; inProgress: number }> = {};
+  const progressByTeam = useMemo(() => {
+    type GoalTaskProgress = {
+      id: string;
+      title: string;
+      status: string;
+      endDate: string;
+      pct: number;
+    };
+
+    type GoalKpiProgress = {
+      id: string;
+      name: string;
+      current: number;
+      target: number;
+      unit: string;
+      pct: number;
+      done: boolean;
+    };
+
+    type GoalProgress = {
+      id: string;
+      title: string;
+      startDate: string;
+      endDate: string;
+      teamLabel: string;
+      color: string | null;
+      doneTasks: number;
+      totalTasks: number;
+      doneKPIs: number;
+      totalKPIs: number;
+      tasksPct: number;
+      kpiPct: number;
+      totalDone: number;
+      totalItems: number;
+      pct: number;
+      tasks: GoalTaskProgress[];
+      kpis: GoalKpiProgress[];
+    };
+
+    type TeamProgress = {
+      teamLabel: string;
+      goalCount: number;
+      goals: GoalProgress[];
+      totalDoneTasks: number;
+      totalTasks: number;
+      totalDoneKPIs: number;
+      totalKPIs: number;
+      doneItems: number;
+      totalItems: number;
+      pct: number;
+      color: string | null;
+    };
+
+    const map: Record<string, TeamProgress> = {};
+
     proj.goals.forEach((g) => {
-      const key = teamName(g.team_id);
-      if (!map[key]) map[key] = { total: 0, done: 0, inProgress: 0 };
-      g.tasks.forEach((t) => {
-        map[key].total++;
-        if (t.status === "Done") map[key].done++;
-        if (t.status === "In Progress") map[key].inProgress++;
-      });
-    });
-    const rows = Object.entries(map)
-      .sort((a, b) => b[1].total - a[1].total)
-      .map(([teamLabel, s]) => ({
-        teamLabel,
-        ...s,
-        pct: s.total ? Math.round((s.done / s.total) * 100) : 0,
+      const teamLabel = teamName(g.team_id);
+      if (!map[teamLabel]) {
+        map[teamLabel] = {
+          teamLabel,
+          goalCount: 0,
+          goals: [],
+          totalDoneTasks: 0,
+          totalTasks: 0,
+          totalDoneKPIs: 0,
+          totalKPIs: 0,
+          doneItems: 0,
+          totalItems: 0,
+          pct: 0,
+          color: g.color,
+        };
+      }
+
+      const doneTasks = g.tasks.filter((t) => t.status === "Done").length;
+      const totalTasks = g.tasks.length;
+      const doneKPIs = g.kpis.filter((k) => k.target > 0 && k.current >= k.target).length;
+      const totalKPIs = g.kpis.length;
+      const totalDone = doneTasks + doneKPIs;
+      const totalItems = totalTasks + totalKPIs;
+      const tasks: GoalTaskProgress[] = g.tasks.map((t) => ({
+        id: t.id,
+        title: t.title || "—",
+        status: t.status,
+        endDate: t.endDate,
+        pct: t.status === "Done" ? 100 : t.status === "In Progress" ? 50 : 0,
       }));
-    const grandTotal = rows.reduce((acc, r) => acc + r.total, 0);
-    return { rows, grandTotal };
-  }, [proj, teams]);
-
-  const prioStats = useMemo(() => {
-    const map: Record<string, { total: number; done: number }> = {};
-    proj.goals.forEach((g) => {
-      const key = g.priority;
-      if (!map[key]) map[key] = { total: 0, done: 0 };
-      map[key].total++;
-      if (g.status === "Завершено") map[key].done++;
-    });
-    return Object.entries(map).map(([prio, s]) => ({ prio, ...s, pct: s.total ? Math.round((s.done / s.total) * 100) : 0 }));
-  }, [proj]);
-
-  interface KpiItem { name: string; current: number; target: number; unit: string; pct: number; done: boolean; goal: string; goalColor: string | null }
-  interface TeamKpi { role: Role; kpis: KpiItem[]; totalDone: number; totalCount: number; pct: number; goalColor: string | null }
-
-  /** Від 0 до 100: прогрес до цілі окремого KPI (частковий виконання враховується). */
-  const kpiToProgressPct = (current: number, target: number) => {
-    if (target > 0) return Math.min(100, (current / target) * 100);
-    return 0;
-  };
-
-  const kpiAgg = useMemo(() => {
-    let completed = 0, total = 0;
-    const byTeam: Record<string, { kpis: KpiItem[]; goalColor: string | null }> = {};
-    proj.goals.forEach((g) => {
-      const team = teamName(g.team_id);
-      if (!byTeam[team]) byTeam[team] = { kpis: [], goalColor: g.color };
-      g.kpis.forEach((k) => {
-        total++;
-        const isDone = k.target > 0 ? k.current >= k.target : false;
-        if (isDone) completed++;
-        const rawPct = k.target ? Math.round((k.current / k.target) * 100) : 0;
-        byTeam[team].kpis.push({
-          name: k.name,
+      const kpis: GoalKpiProgress[] = g.kpis.map((k) => {
+        const rawPct = k.target > 0 ? Math.round((k.current / k.target) * 100) : 0;
+        return {
+          id: k.id,
+          name: k.name || "—",
           current: k.current,
           target: k.target,
           unit: k.unit,
-          pct: rawPct,
-          done: isDone,
-          goal: g.title || "—",
-          goalColor: g.color,
-        });
-      });
-    });
-    const teams: TeamKpi[] = Object.entries(byTeam)
-      .sort((a, b) => b[1].kpis.length - a[1].kpis.length)
-      .map(([role, { kpis, goalColor }]) => {
-        const totalDone = kpis.filter((k) => k.done).length;
-        const avgProgress =
-          kpis.length > 0
-            ? Math.round(
-                kpis.reduce((sum, k) => sum + kpiToProgressPct(k.current, k.target), 0) / kpis.length,
-              )
-            : 0;
-        return {
-          role: role as Role,
-          kpis,
-          totalDone,
-          totalCount: kpis.length,
-          pct: avgProgress,
-          goalColor,
+          pct: Math.min(Math.max(rawPct, 0), 100),
+          done: k.target > 0 && k.current >= k.target,
         };
       });
-    return { completed, total, teams };
-  }, [proj]);
+
+      const goalProgress: GoalProgress = {
+        id: g.id,
+        title: g.title || "—",
+        startDate: g.startDate,
+        endDate: g.endDate,
+        teamLabel,
+        color: g.color,
+        doneTasks,
+        totalTasks,
+        doneKPIs,
+        totalKPIs,
+        tasksPct: totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0,
+        kpiPct: totalKPIs > 0 ? Math.round((doneKPIs / totalKPIs) * 100) : 0,
+        totalDone,
+        totalItems,
+        pct: totalItems > 0 ? Math.round((totalDone / totalItems) * 100) : 0,
+        tasks,
+        kpis,
+      };
+
+      const team = map[teamLabel];
+      team.goalCount++;
+      team.goals.push(goalProgress);
+      team.totalDoneTasks += doneTasks;
+      team.totalTasks += totalTasks;
+      team.totalDoneKPIs += doneKPIs;
+      team.totalKPIs += totalKPIs;
+      team.doneItems += totalDone;
+      team.totalItems += totalItems;
+    });
+
+    return Object.values(map)
+      .map((team) => ({
+        ...team,
+        goals: team.goals.sort((a, b) => b.pct - a.pct),
+        pct: team.totalItems > 0 ? Math.round((team.doneItems / team.totalItems) * 100) : 0,
+      }))
+      .sort((a, b) => b.pct - a.pct);
+  }, [proj, teams]);
 
   const markers = useMemo(() => {
     const now = today();
     let overdueTasks = 0, blockedGoals = 0, upcomingDeadlines = 0;
     const overdueByTeam: Record<string, { title: string; endDate: string; goal: string; color: string | null }[]> = {};
+    const upcomingByTeam: Record<string, { title: string; endDate: string; color: string | null }[]> = {};
     proj.goals.forEach((g) => {
       if (g.status === "Заблоковано") blockedGoals++;
       const daysLeft = diffDays(now, g.endDate);
-      if (daysLeft >= 0 && daysLeft <= 14 && g.status !== "Завершено") upcomingDeadlines++;
+      if (daysLeft >= 0 && daysLeft <= 14 && g.status !== "Завершено") {
+        upcomingDeadlines++;
+        const team = teamName(g.team_id);
+        if (!upcomingByTeam[team]) upcomingByTeam[team] = [];
+        upcomingByTeam[team].push({ title: g.title, endDate: g.endDate, color: g.color });
+      }
       g.tasks.forEach((t) => {
         if (t.status !== "Done" && t.endDate < now) {
           overdueTasks++;
-          const team = t.assignee;
+          const team = teamName(g.team_id);
           if (!overdueByTeam[team]) overdueByTeam[team] = [];
           overdueByTeam[team].push({ title: t.title, endDate: t.endDate, goal: g.title, color: t.color ?? g.color });
         }
       });
     });
-    return { overdueTasks, blockedGoals, upcomingDeadlines, overdueByTeam };
+    return { overdueTasks, blockedGoals, upcomingDeadlines, overdueByTeam, upcomingByTeam };
   }, [proj]);
-
-  const prioColors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
 
   const goalsPct = stats.totalGoals > 0 ? Math.round((stats.goalsDone / stats.totalGoals) * 100) : 0;
   const tasksPct = Number.isFinite(stats.taskPct) ? stats.taskPct : 0;
@@ -258,281 +306,303 @@ export function Dashboard({ proj, stats, teams }: DashboardProps) {
 
   return (
     <div>
-      {/* Alert markers */}
+      {/* Unified alerts widget */}
       {(markers.overdueTasks > 0 || markers.blockedGoals > 0 || markers.upcomingDeadlines > 0) && (
-        <div className="flex gap-2.5 mx-4 mt-4 flex-wrap">
-          {markers.overdueTasks > 0 && (
-            <Item
-              variant="outline"
-              className="flex-1 min-w-[140px] border-l-4 border-destructive bg-destructive/10 cursor-pointer hover:bg-destructive/15 transition-colors"
-              onClick={() => navigate(`/${projectId}/goals?overdue=1`)}
-            >
-              <ItemContent>
-                <ItemTitle className="text-lg font-extrabold text-destructive">{markers.overdueTasks}</ItemTitle>
-                <ItemDescription className="text-destructive font-semibold">Прострочені задачі</ItemDescription>
-              </ItemContent>
-            </Item>
-          )}
-          {markers.blockedGoals > 0 && (
-            <Item variant="outline" className="flex-1 min-w-[140px] border-l-4 border-warning bg-warning/10">
-              <ItemContent>
-                <ItemTitle className="text-lg font-extrabold text-warning-foreground">{markers.blockedGoals}</ItemTitle>
-                <ItemDescription className="text-warning-foreground font-semibold">Заблоковані цілі</ItemDescription>
-              </ItemContent>
-            </Item>
-          )}
-          {markers.upcomingDeadlines > 0 && (
-            <Item variant="outline" className="flex-1 min-w-[140px] border-l-4 border-info bg-info/10">
-              <ItemContent>
-                <ItemTitle className="text-lg font-extrabold text-info">{markers.upcomingDeadlines}</ItemTitle>
-                <ItemDescription className="text-info font-semibold">Дедлайни ≤ 14 днів</ItemDescription>
-              </ItemContent>
-            </Item>
-          )}
-        </div>
+        <Card className="mx-4 mt-4">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-1.5">
+              <AlertTriangle className="size-4" /> Контроль дедлайнів
+            </CardTitle>
+            <CardDescription>Огляд, прострочені задачі по командах та цілі з дедлайном до 14 днів</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <Tabs defaultValue="summary" className="w-full">
+              <TabsList className="w-full justify-start">
+                <TabsTrigger value="summary">Огляд</TabsTrigger>
+                <TabsTrigger value="overdue-teams">Прострочені по командах</TabsTrigger>
+                <TabsTrigger value="upcoming">Дедлайни ≤ 14 днів</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="summary" className="mt-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <Item
+                    variant="outline"
+                    className="border-l-4 border-destructive bg-destructive/10 cursor-pointer hover:bg-destructive/15 transition-colors"
+                    onClick={() => navigate(`${goalsPath}?overdue=1`)}
+                  >
+                    <ItemContent>
+                      <ItemTitle className="text-lg font-extrabold text-destructive">{markers.overdueTasks}</ItemTitle>
+                      <ItemDescription className="text-destructive font-semibold">Прострочені задачі</ItemDescription>
+                    </ItemContent>
+                  </Item>
+                  <Item variant="outline" className="border-l-4 border-info bg-info/10">
+                    <ItemContent>
+                      <ItemTitle className="text-lg font-extrabold text-info">{markers.upcomingDeadlines}</ItemTitle>
+                      <ItemDescription className="text-info font-semibold">Дедлайни ≤ 14 днів</ItemDescription>
+                    </ItemContent>
+                  </Item>
+                  <Item variant="outline" className="border-l-4 border-warning bg-warning/10">
+                    <ItemContent>
+                      <ItemTitle className="text-lg font-extrabold text-warning-foreground">{markers.blockedGoals}</ItemTitle>
+                      <ItemDescription className="text-warning-foreground font-semibold">Заблоковані цілі</ItemDescription>
+                    </ItemContent>
+                  </Item>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="overdue-teams" className="mt-3">
+                {markers.overdueTasks === 0 ? (
+                  <ItemDescription className="text-sm text-muted-foreground py-3">Немає прострочених задач</ItemDescription>
+                ) : (
+                  <ItemGroup className="gap-2.5">
+                    {Object.entries(markers.overdueByTeam).map(([team, tasks]) => {
+                      const firstColor = tasks[0]?.color;
+                      const oac = getAccentDef(firstColor);
+                      return (
+                        <div key={team}>
+                          <Item size="xs" className={cn("rounded-t-md gap-1.5", oac.bgLight)}>
+                            <ItemMedia className="self-center">
+                              <span className={cn("size-2 rounded-full", oac.bg)} />
+                            </ItemMedia>
+                            <ItemTitle className={cn("text-xs", oac.text)}>{team}</ItemTitle>
+                            <ItemActions>
+                              <Badge variant="destructive" className="text-[10px] font-semibold">
+                                {tasks.length} {tasks.length === 1 ? "задача" : "задач"}
+                              </Badge>
+                            </ItemActions>
+                          </Item>
+                          <ItemGroup>
+                            {tasks.map((t, i) => (
+                              <Item key={i} size="xs" className="bg-destructive/5 rounded-none last:rounded-b-md gap-2 pl-6">
+                                <ItemContent className="flex-row items-center gap-2 min-w-0">
+                                  <span className="text-[11px] font-semibold truncate">{t.title}</span>
+                                  <span className="text-[11px] text-muted-foreground">({t.goal})</span>
+                                </ItemContent>
+                                <ItemActions>
+                                  <span className="text-destructive font-semibold text-[10px] whitespace-nowrap">дедлайн: {medDate(t.endDate)}</span>
+                                </ItemActions>
+                              </Item>
+                            ))}
+                          </ItemGroup>
+                        </div>
+                      );
+                    })}
+                  </ItemGroup>
+                )}
+              </TabsContent>
+
+              <TabsContent value="upcoming" className="mt-3">
+                {markers.upcomingDeadlines === 0 ? (
+                  <ItemDescription className="text-sm text-muted-foreground py-3">Немає цілей з дедлайном у межах 14 днів</ItemDescription>
+                ) : (
+                  <ItemGroup className="gap-2.5">
+                    {Object.entries(markers.upcomingByTeam).map(([team, goals]) => {
+                      const firstColor = goals[0]?.color;
+                      const uac = getAccentDef(firstColor);
+                      return (
+                        <div key={team}>
+                          <Item size="xs" className={cn("rounded-t-md gap-1.5", uac.bgLight)}>
+                            <ItemMedia className="self-center">
+                              <span className={cn("size-2 rounded-full", uac.bg)} />
+                            </ItemMedia>
+                            <ItemTitle className={cn("text-xs", uac.text)}>{team}</ItemTitle>
+                            <ItemActions>
+                              <Badge variant="outline" className="text-[10px] font-semibold">
+                                {goals.length} {goals.length === 1 ? "ціль" : "цілей"}
+                              </Badge>
+                            </ItemActions>
+                          </Item>
+                          <ItemGroup>
+                            {goals.map((g, i) => (
+                              <Item key={i} size="xs" className="bg-info/5 rounded-none last:rounded-b-md gap-2 pl-6">
+                                <ItemContent className="flex-row items-center gap-2 min-w-0">
+                                  <span className="text-[11px] font-semibold truncate">{g.title || "—"}</span>
+                                </ItemContent>
+                                <ItemActions>
+                                  <span className="text-info font-semibold text-[10px] whitespace-nowrap">дедлайн: {medDate(g.endDate)}</span>
+                                </ItemActions>
+                              </Item>
+                            ))}
+                          </ItemGroup>
+                        </div>
+                      );
+                    })}
+                  </ItemGroup>
+                )}
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
       )}
 
       {/* Two-column layout */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mx-4 mt-4">
         {/* LEFT COLUMN */}
         <div className="flex flex-col gap-4">
-          {/* KPI по командах */}
+          {/* Прогрес */}
           <Card className="flex flex-col">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-1.5">
-                <BarChart3 className="size-4" /> KPI по командах
+                <BarChart3 className="size-4" /> Прогрес
               </CardTitle>
               <CardDescription>
-                Виконано {stats.completedKPIs} з {stats.totalKPIs} ({kpiPct}%)
+                По командах: усі цілі, KPI та задачі
               </CardDescription>
             </CardHeader>
             <CardContent className="flex-1">
-              {kpiAgg.teams.length === 0 ? (
-                <ItemDescription className="text-center py-8">Немає KPI</ItemDescription>
-              ) : (
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-4">
-                  {kpiAgg.teams.map((t) => {
-                    const tac = getAccentDef(t.goalColor);
-                    const fillPct = t.pct;
-                    const restPct = Math.max(0, 100 - fillPct);
-                    const teamConfig: ChartConfig = {
-                      done: { label: "Прогрес", color: tac.hex },
-                      remaining: { label: "Залишок до 100%", color: "var(--muted)" },
-                    };
-                    return (
-                      <Card key={t.role} className="flex flex-col">
-                        <CardContent>
-                          <ChartContainer config={teamConfig} className="mx-auto aspect-square max-h-[200px]">
-                            <RadialBarChart
-                              data={[{ done: fillPct, remaining: restPct }]}
-                              innerRadius={60}
-                              outerRadius={85}
-                              startAngle={90}
-                              endAngle={90 - (t.totalCount > 0 ? (fillPct / 100) * 360 : 0)}
-                            >
-                              <PolarGrid gridType="circle" radialLines={false} stroke="none" className="first:fill-muted last:fill-transparent" polarRadius={[63, 57]} />
-                              <RadialBar dataKey="done" fill="var(--color-done)" background cornerRadius={6} className="stroke-transparent stroke-2" />
-                              <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
-                                <Label
-                                  content={({ viewBox }) => {
-                                    const pt = viewBox && svgPoint(viewBox as { cx?: unknown; cy?: unknown });
-                                    if (!pt) return null;
-                                    const { cx, cy } = pt;
-                                    return (
-                                      <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
-                                        <tspan x={cx} y={cy - 10} className="fill-foreground text-2xl font-bold">
-                                          {t.pct}%
-                                        </tspan>
-                                        <tspan x={cx} y={cy + 8} className="fill-muted-foreground text-[10px]">
-                                          середній прогрес до цілі
-                                        </tspan>
-                                        <tspan x={cx} y={cy + 24} className="fill-muted-foreground text-[10px]">
-                                          {t.totalDone}/{t.totalCount} KPI на 100%
-                                        </tspan>
-                                      </text>
-                                    );
-                                  }}
-                                />
-                              </PolarRadiusAxis>
-                            </RadialBarChart>
-                          </ChartContainer>
-                        </CardContent>
-                        <CardFooter className="flex-col px-4 pb-0">
-                          <Accordion
-                            type="single"
-                            collapsible
-                            className="w-full rounded-lg border"
-                            defaultValue={Object.keys(
-                              t.kpis.reduce<Record<string, boolean>>((acc, k) => { acc[k.goal] = true; return acc; }, {}),
-                            )[0]}
-                          >
-                            {(() => {
-                              const byGoal: Record<string, typeof t.kpis> = {};
-                              t.kpis.forEach((k) => {
-                                if (!byGoal[k.goal]) byGoal[k.goal] = [];
-                                byGoal[k.goal].push(k);
-                              });
-                              return Object.entries(byGoal).map(([goal, kpis]) => {
-                                const goalDone = kpis.filter((k) => k.done).length;
-                                const goalAvgPct =
-                                  kpis.length > 0
-                                    ? Math.round(
-                                        kpis.reduce(
-                                          (sum, k) => sum + kpiToProgressPct(k.current, k.target),
-                                          0,
-                                        ) / kpis.length,
-                                      )
-                                    : 0;
-                                return (
-                                  <AccordionItem key={goal} value={goal} className="border-b px-4 last:border-b-0">
-                                    <AccordionTrigger>
-                                      <div className="flex items-center gap-2 flex-1">
-                                        <span className="font-semibold text-sm">{goal}</span>
-                                        <span className="text-xs text-muted-foreground ml-auto mr-2">
-                                          {goalDone}/{kpis.length} KPI
-                                        </span>
-                                      </div>
-                                    </AccordionTrigger>
-                                    <AccordionContent>
-                                      <Table>
-                                        <TableHeader>
-                                          <TableRow>
-                                            <TableHead>KPI</TableHead>
-                                            <TableHead className="text-right">Поточне</TableHead>
-                                            <TableHead className="text-right">%</TableHead>
-                                          </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                          {kpis.map((k, i) => (
-                                            <TableRow key={i}>
-                                              <TableCell className={cn("font-medium", k.done ? "text-success" : "text-foreground")}>
-                                                {k.done ? "✓ " : ""}{k.name}
-                                              </TableCell>
-                                              <TableCell className={cn("text-right tabular-nums font-semibold", k.done ? "text-success" : "text-foreground")}>
-                                                {fmtNum(k.current)}/{fmtNum(k.target)} {k.unit}
-                                              </TableCell>
-                                              <TableCell className={cn("text-right tabular-nums font-semibold", k.done ? "text-success" : "text-muted-foreground")}>
-                                                {Math.min(k.pct, 999)}%
-                                              </TableCell>
-                                            </TableRow>
-                                          ))}
-                                        </TableBody>
-                                        <TableFooter>
-                                          <TableRow>
-                                            <TableCell>Разом</TableCell>
-                                            <TableCell className="text-right font-semibold tabular-nums text-success">
-                                              {goalDone}/{kpis.length}
-                                            </TableCell>
-                                            <TableCell className="text-right font-semibold tabular-nums">
-                                              {goalAvgPct}%
-                                            </TableCell>
-                                          </TableRow>
-                                        </TableFooter>
-                                      </Table>
-                                    </AccordionContent>
-                                  </AccordionItem>
-                                );
-                              });
-                            })()}
-                          </Accordion>
-                        </CardFooter>
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
-              
-            </CardContent>
-          </Card>
-
-          {/* Задачі по командах + По пріоритету */}
-          <Card className="flex flex-col">
-            <CardHeader>
-              <CardTitle className="text-sm flex items-center gap-1.5">
-                <Users className="size-4" /> Задачі по командах
-              </CardTitle>
-              <CardDescription>
-                Усі задачі з усіх цілей; частка команди від загальної кількості задач у проєкті
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-5">
-              {teamStats.grandTotal === 0 ? (
-                <ItemDescription className="text-center py-8">Немає задач</ItemDescription>
+              {progressByTeam.length === 0 ? (
+                <ItemDescription className="text-center py-8">Немає цілей</ItemDescription>
               ) : (
                 <div className="flex flex-col gap-3">
-                  {teamStats.rows.map((t) => {
-                    const rc = roleColor(t.teamLabel);
-                    const goalForTeam = proj.goals.find((g) => teamName(g.team_id) === t.teamLabel);
-                    const tac = goalForTeam ? getAccentDef(goalForTeam.color) : { text: rc.text, bg: rc.bg };
-                    const sharePct =
-                      teamStats.grandTotal > 0
-                        ? Math.round((t.total / teamStats.grandTotal) * 100)
-                        : 0;
+                  {progressByTeam.map((team) => {
+                    const teamAccent = getAccentDef(team.color);
                     return (
-                      <div key={t.teamLabel} className="flex items-center gap-3">
-                        <div className="shrink-0 w-[92px] min-w-0">
-                          <div className={cn("text-xs font-bold leading-tight truncate", tac.text)} title={t.teamLabel}>
-                            {t.teamLabel}
+                      <div key={team.teamLabel} className="rounded-lg border overflow-hidden">
+                        <div className={cn("px-3 py-2.5 border-b", teamAccent.bgLight)}>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className={cn("text-sm font-bold truncate", teamAccent.text)}>{team.teamLabel}</div>
+                              <div className="text-[10px] text-muted-foreground">
+                                Цілей: {team.goalCount} · KPI {team.totalDoneKPIs}/{team.totalKPIs} · Задачі {team.totalDoneTasks}/{team.totalTasks}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="text-sm font-bold tabular-nums">{team.pct}%</div>
+                              <div className="text-[10px] text-muted-foreground">загальний прогрес</div>
+                            </div>
                           </div>
-                          <div
-                            className="text-[10px] text-muted-foreground tabular-nums mt-1 leading-tight"
-                            title={`${t.total} з ${teamStats.grandTotal} усіх задач у проєкті`}
-                          >
-                            {sharePct}% усіх задач
-                          </div>
-                        </div>
-                        <div className="flex-1 min-w-0 self-center">
-                          <ProgressBar current={t.done} target={t.total} colorClass={tac.bg} />
-                        </div>
-                        <div className="shrink-0 text-right space-y-0.5 self-center">
-                          <div className="text-xs tabular-nums font-semibold" title="виконано / задач цієї команди у всіх її цілях">
-                            {t.done}/{t.total}
+                          <div className="mt-2">
+                            <ProgressBar current={team.doneItems} target={team.totalItems} colorClass={teamAccent.bg} />
                           </div>
                         </div>
+
+                        <Accordion type="single" collapsible className="w-full">
+                          {team.goals.map((g) => {
+                            const gac = getAccentDef(g.color);
+                            return (
+                              <AccordionItem key={g.id} value={g.id} className="border-b px-3 last:border-b-0">
+                                <AccordionTrigger>
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <span className="font-semibold text-sm truncate">{g.title}</span>
+                                    <Badge variant="secondary" className={cn("text-[10px]", gac.text)}>
+                                      {g.pct}%
+                                    </Badge>
+                                  </div>
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                  <div className="space-y-2 pb-2">
+                                    <div className="flex items-center justify-between text-[11px]">
+                                      <span className="text-muted-foreground">Період: {medDate(g.startDate)} - {medDate(g.endDate)}</span>
+                                      <span className="tabular-nums font-semibold">Разом: {g.totalDone}/{g.totalItems}</span>
+                                    </div>
+                                    <Accordion type="multiple" className="w-full rounded-md border">
+                                      <AccordionItem value={`tasks-${g.id}`} className="px-2">
+                                        <AccordionTrigger className="py-2">
+                                          <div className="flex items-center justify-between w-full gap-2">
+                                            <span className="text-[11px] font-semibold">
+                                              Задачі {g.doneTasks}/{g.totalTasks} ({g.tasksPct}%)
+                                            </span>
+                                            <Badge variant="secondary" className={cn("text-[10px]", gac.text)}>
+                                              {g.tasksPct}%
+                                            </Badge>
+                                          </div>
+                                        </AccordionTrigger>
+                                        <AccordionContent className="pb-2">
+                                          <div className="space-y-2">
+                                            <ProgressBar current={g.doneTasks} target={g.totalTasks} colorClass={gac.bg} />
+                                            {g.tasks.length === 0 ? (
+                                              <ItemDescription className="text-[11px] text-muted-foreground">Немає задач</ItemDescription>
+                                            ) : (
+                                              <div className="space-y-1.5">
+                                                {g.tasks.map((task) => (
+                                                  <button
+                                                    key={task.id}
+                                                    type="button"
+                                                    onClick={() => openGoal(g.id)}
+                                                    className="w-full text-left rounded-md border px-2 py-1.5 hover:bg-muted/40 transition-colors cursor-pointer"
+                                                    title="Відкрити ціль у списку цілей"
+                                                  >
+                                                    <div className="flex items-center justify-between gap-2 text-[11px]">
+                                                      <span className="font-medium truncate">{task.title}</span>
+                                                      <span className="text-muted-foreground shrink-0">{task.pct}%</span>
+                                                    </div>
+                                                    <div className="mt-1">
+                                                      <ProgressBar current={task.pct} target={100} colorClass={gac.bg} />
+                                                    </div>
+                                                  </button>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </AccordionContent>
+                                      </AccordionItem>
+                                      <AccordionItem value={`kpis-${g.id}`} className="px-2">
+                                        <AccordionTrigger className="py-2">
+                                          <div className="flex items-center justify-between w-full gap-2">
+                                            <span className="text-[11px] font-semibold">
+                                              KPI {g.doneKPIs}/{g.totalKPIs} ({g.kpiPct}%)
+                                            </span>
+                                            <Badge variant="secondary" className={cn("text-[10px]", gac.text)}>
+                                              {g.kpiPct}%
+                                            </Badge>
+                                          </div>
+                                        </AccordionTrigger>
+                                        <AccordionContent className="pb-2">
+                                          <div className="space-y-2">
+                                            <ProgressBar current={g.doneKPIs} target={g.totalKPIs} colorClass={gac.bg} />
+                                            {g.kpis.length === 0 ? (
+                                              <ItemDescription className="text-[11px] text-muted-foreground">Немає KPI</ItemDescription>
+                                            ) : (
+                                              <div className="space-y-1.5">
+                                                {g.kpis.map((kpi) => (
+                                                  <button
+                                                    key={kpi.id}
+                                                    type="button"
+                                                    onClick={() => openGoal(g.id)}
+                                                    className="w-full text-left rounded-md border px-2 py-1.5 hover:bg-muted/40 transition-colors cursor-pointer"
+                                                    title="Відкрити ціль у списку цілей"
+                                                  >
+                                                    <div className="flex items-center justify-between gap-2 text-[11px]">
+                                                      <span className="font-medium truncate">{kpi.name}</span>
+                                                      <span className="text-muted-foreground shrink-0">
+                                                        {kpi.current}/{kpi.target} {kpi.unit}
+                                                      </span>
+                                                    </div>
+                                                    <div className="mt-1">
+                                                      <ProgressBar current={kpi.pct} target={100} colorClass={gac.bg} />
+                                                    </div>
+                                                  </button>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </AccordionContent>
+                                      </AccordionItem>
+                                    </Accordion>
+                                    <button
+                                      type="button"
+                                      onClick={() => openGoal(g.id)}
+                                      className={cn(
+                                        "text-[11px] font-semibold underline-offset-2 hover:underline cursor-pointer",
+                                        gac.text,
+                                      )}
+                                    >
+                                      Відкрити в цілях
+                                    </button>
+                                  </div>
+                                </AccordionContent>
+                              </AccordionItem>
+                            );
+                          })}
+                        </Accordion>
                       </div>
                     );
                   })}
                 </div>
               )}
-
-              {/* По пріоритету */}
-              {prioStats.length > 0 && (
-                <div className="border-t border-border pt-4">
-                  <div className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-1.5">
-                    <Target className="size-3.5" /> По пріоритету
-                  </div>
-                  <div className="flex flex-col gap-3">
-                    {prioStats.map((p, i) => (
-                      <div key={p.prio} className="flex items-center gap-3">
-                        <span className="flex items-center gap-2 text-xs w-[80px] shrink-0 truncate text-muted-foreground">
-                          <span className="size-2.5 rounded-sm shrink-0" style={{ background: prioColors[i % prioColors.length] }} />
-                          {p.prio}
-                        </span>
-                        <div className="flex-1 min-w-0 h-2 rounded-full bg-muted overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{ width: `${p.pct}%`, background: prioColors[i % prioColors.length] }}
-                          />
-                        </div>
-                        <span className="text-xs tabular-nums font-semibold shrink-0 w-[52px] text-right">
-                          {p.done}/{p.total}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground shrink-0 w-[32px] text-right">
-                          {p.pct}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </CardContent>
-            <CardFooter className="pt-2">
-              <span className="text-[11px] text-muted-foreground">
-                Усього {teamStats.grandTotal} задач у всіх цілях ·{" "}
-                {teamStats.rows.reduce((a, t) => a + t.done, 0)} виконано
-              </span>
-            </CardFooter>
           </Card>
+
         </div>
 
         {/* RIGHT COLUMN */}
@@ -633,101 +703,9 @@ export function Dashboard({ proj, stats, teams }: DashboardProps) {
             </CardFooter>
           </Card>
 
-          {/* Прогрес цілей */}
-          <Card className="flex flex-col">
-            <CardHeader>
-              <CardTitle className="text-sm flex items-center gap-1.5">
-                <BarChart3 className="size-4" /> Прогрес цілей
-              </CardTitle>
-              <CardDescription>Задачі і KPI по кожній цілі</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col gap-3">
-                {proj.goals.map((g) => {
-                  const doneTasks = g.tasks.filter((t) => t.status === "Done").length;
-                  const doneKPIs = g.kpis.filter((k) => k.current >= k.target).length;
-                  const gac = getAccentDef(g.color);
-                  const taskTotal = g.tasks.length;
-                  const kpiTotal = g.kpis.length;
-
-                  return (
-                    <div key={g.id} className={cn("rounded-lg border overflow-hidden", gac.bgLight, gac.border)}>
-                      <div className="px-3 pt-3 pb-1">
-                        <div className="text-[13px] font-bold truncate">{g.title || "—"}</div>
-                        <div className="flex gap-1.5 items-center mt-1 flex-wrap">
-                          <Badge variant="secondary" className={cn("text-[10px]", gac.text)}>{teamName(g.team_id)}</Badge>
-                          <Badge variant="outline" className="text-[10px]">📅 {medDate(g.startDate)} – {medDate(g.endDate)}</Badge>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 mt-2 text-[10px]">
-                          <div>
-                            <span className="text-muted-foreground">Задачі</span>
-                            <span className={cn("ml-1 font-bold", gac.text)}>{doneTasks}/{taskTotal}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">KPI</span>
-                            <span className={cn("ml-1 font-bold", gac.text)}>{doneKPIs}/{kpiTotal}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 px-3 pb-2.5 pt-1">
-                        <ProgressBar current={doneTasks} target={taskTotal} colorClass={gac.bg} />
-                        <ProgressBar current={doneKPIs} target={kpiTotal} colorClass={gac.bg} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
 
-      {/* Overdue tasks */}
-      {markers.overdueTasks > 0 && (
-        <Card className="mx-4 mt-4">
-          <CardHeader>
-            <CardTitle className="text-sm text-destructive flex items-center gap-1.5">
-              <AlertTriangle className="size-4" /> Прострочені задачі по командах
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ItemGroup className="gap-2.5">
-              {Object.entries(markers.overdueByTeam).map(([team, tasks]) => {
-                const firstColor = tasks[0]?.color;
-                const oac = getAccentDef(firstColor);
-                return (
-                  <div key={team}>
-                    <Item size="xs" className={cn("rounded-t-md gap-1.5", oac.bgLight)}>
-                      <ItemMedia className="self-center">
-                        <span className={cn("size-2 rounded-full", oac.bg)} />
-                      </ItemMedia>
-                      <ItemTitle className={cn("text-xs", oac.text)}>{team}</ItemTitle>
-                      <ItemActions>
-                        <Badge variant="destructive" className="text-[10px] font-semibold">
-                          {tasks.length} {tasks.length === 1 ? "задача" : "задач"}
-                        </Badge>
-                      </ItemActions>
-                    </Item>
-                    <ItemGroup>
-                      {tasks.map((t, i) => (
-                        <Item key={i} size="xs" className="bg-destructive/5 rounded-none last:rounded-b-md gap-2 pl-6">
-                          <ItemContent className="flex-row items-center gap-2 min-w-0">
-                            <span className="text-[11px] font-semibold truncate">{t.title}</span>
-                            <span className="text-[11px] text-muted-foreground">({t.goal})</span>
-                          </ItemContent>
-                          <ItemActions>
-                            <span className="text-destructive font-semibold text-[10px] whitespace-nowrap">дедлайн: {medDate(t.endDate)}</span>
-                          </ItemActions>
-                        </Item>
-                      ))}
-                    </ItemGroup>
-                  </div>
-                );
-              })}
-            </ItemGroup>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

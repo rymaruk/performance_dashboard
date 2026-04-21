@@ -4,6 +4,8 @@ import {
   useEffect,
   useState,
   useCallback,
+  useMemo,
+  useRef,
   type ReactNode,
 } from "react";
 import type { Session } from "@supabase/supabase-js";
@@ -60,17 +62,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const isMountedRef = useRef(true);
 
   const loadProfile = useCallback(async (userId: string) => {
     const p = await fetchProfile(userId);
+    if (!isMountedRef.current) return;
     setProfile(p);
   }, []);
 
   useEffect(() => {
+    isMountedRef.current = true;
     supabase.auth.getSession().then(({ data: { session: s } }) => {
+      if (!isMountedRef.current) return;
       setSession(s);
       if (s?.user) {
-        loadProfile(s.user.id).finally(() => setLoading(false));
+        loadProfile(s.user.id).finally(() => {
+          if (isMountedRef.current) setLoading(false);
+        });
       } else {
         setLoading(false);
       }
@@ -79,15 +87,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, s) => {
+      if (!isMountedRef.current) return;
       setSession(s);
       if (s?.user) {
-        loadProfile(s.user.id);
+        void loadProfile(s.user.id);
       } else {
         setProfile(null);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMountedRef.current = false;
+      subscription.unsubscribe();
+    };
   }, [loadProfile]);
 
   const login = useCallback(async (email: string, password: string) => {
@@ -125,20 +137,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (session?.user) await loadProfile(session.user.id);
   }, [session, loadProfile]);
 
+  const value = useMemo(
+    () => ({
+      session,
+      profile,
+      loading,
+      isAdmin: profile?.role === "admin",
+      userTeamId: profile?.team_id ?? null,
+      login,
+      register,
+      logout,
+      refreshProfile,
+    }),
+    [session, profile, loading, login, register, logout, refreshProfile],
+  );
+
   return (
-    <AuthCtx.Provider
-      value={{
-        session,
-        profile,
-        loading,
-        isAdmin: profile?.role === "admin",
-        userTeamId: profile?.team_id ?? null,
-        login,
-        register,
-        logout,
-        refreshProfile,
-      }}
-    >
+    <AuthCtx.Provider value={value}>
       {children}
     </AuthCtx.Provider>
   );

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "../ui/button";
 import {
@@ -79,6 +79,7 @@ export function Goals({
   const filterPeriodFrom = searchParams.get("from");
   const filterPeriodTo = searchParams.get("to");
   const filterOverdue = searchParams.get("overdue") === "1";
+  const focusedGoalId = searchParams.get("id");
 
   const setFilter = useCallback(
     (key: string, value: string | null) => {
@@ -181,6 +182,40 @@ export function Goals({
   const hasFilters = filterTeam || filterPrio || filterStatus || filterUser || filterPeriodFrom || filterPeriodTo || filterOverdue;
   const noGoals = proj.goals.length === 0;
   const noMatches = filtered.length === 0;
+
+  useEffect(() => {
+    if (!focusedGoalId) return;
+    if (!filtered.some((g) => g.id === focusedGoalId)) return;
+    if (openGoalIds.length === 1 && openGoalIds[0] === focusedGoalId) return;
+
+    onOpenGoalIdsChange([focusedGoalId]);
+
+    const rafId = requestAnimationFrame(() => {
+      const el = document.getElementById(`goal-${focusedGoalId}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [focusedGoalId, filtered, openGoalIds, onOpenGoalIdsChange]);
+
+  const handleOpenGoalIdsChange = useCallback(
+    (ids: string[]) => {
+      const normalizedIds =
+        focusedGoalId && ids.includes(focusedGoalId) ? [focusedGoalId] : ids;
+      onOpenGoalIdsChange(normalizedIds);
+
+      if (!focusedGoalId) return;
+      if (!openGoalIds.includes(focusedGoalId)) return;
+      if (normalizedIds.includes(focusedGoalId)) return;
+
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("id");
+        return next;
+      }, { replace: true });
+    },
+    [focusedGoalId, openGoalIds, onOpenGoalIdsChange, setSearchParams],
+  );
 
   return (
     <div>
@@ -308,7 +343,7 @@ export function Goals({
         <Accordion
           type="multiple"
           value={openGoalIds}
-          onValueChange={onOpenGoalIdsChange}
+          onValueChange={handleOpenGoalIdsChange}
           className="px-4 pt-2"
         >
           {filtered.map((g) => (
