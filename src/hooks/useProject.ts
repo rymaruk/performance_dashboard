@@ -21,7 +21,7 @@ import type {
   UserProfile,
   KpiValueHistory,
 } from "../types";
-import type { Role, Priority, GoalStatus, TaskStatus } from "../types";
+import type { Role, Priority, GoalStatus, TaskStatus, KpiStatus } from "../types";
 
 const EMPTY_PROJECT: Project = {
   id: "",
@@ -82,6 +82,7 @@ function kpiFromJunction(row: GoalKpiRow): KPI {
     target: Number(row.target_value),
     unit: def?.unit ?? "%",
     color: row.color ?? def?.color ?? null,
+    status: (row.status as KpiStatus) ?? "В процесі",
   };
 }
 
@@ -518,6 +519,35 @@ export function useProject(activeProjectId: string) {
       return;
     }
 
+    if (field === "status") {
+      const newStatus = value as GoalStatus;
+      const kpiStatus: KpiStatus | null =
+        newStatus === "В процесі" ? "В процесі"
+        : newStatus === "Завершено" ? "Завершено"
+        : null;
+
+      if (kpiStatus !== null) {
+        // Cascade status to all KPIs
+        updateLocalGoal(gid, (g) => ({
+          ...g,
+          status: newStatus,
+          kpis: g.kpis.map((k) => ({ ...k, status: kpiStatus })),
+        }));
+        await supabase.from("goals").update({ status: newStatus }).eq("id", gid);
+        const goal = proj.goals.find((x) => x.id === gid);
+        if (goal && goal.kpis.length > 0) {
+          const kpiIds = goal.kpis.map((k) => k.id);
+          await supabase.from("goal_kpis").update({ status: kpiStatus }).in("id", kpiIds);
+        }
+        return;
+      }
+
+      // For other statuses (Планується, На ревʼю, Заблоковано) — update goal only
+      updateLocalGoal(gid, (g) => ({ ...g, status: newStatus }));
+      await supabase.from("goals").update({ status: newStatus }).eq("id", gid);
+      return;
+    }
+
     updateLocalGoal(gid, (g) => ({ ...g, [field]: value }));
     const dbField =
       field === "startDate"
@@ -534,6 +564,44 @@ export function useProject(activeProjectId: string) {
       .from("goals")
       .update({ [dbField]: value })
       .eq("id", gid);
+  };
+
+  /* ─── KPI status update with reverse goal sync ─── */
+  const updateKPIStatus = async (gid: string, kid: string, newKpiStatus: KpiStatus) => {
+    const goal = proj.goals.find((g) => g.id === gid);
+    if (!goal) return;
+
+    // Compute what KPIs will look like after this change
+    const updatedKpis = goal.kpis.map((k) =>
+      k.id === kid ? { ...k, status: newKpiStatus } : k,
+    );
+
+    // Reverse sync: determine if goal status should change
+    let newGoalStatus: GoalStatus | null = null;
+    if (newKpiStatus === "В процесі" && goal.status === "Завершено") {
+      // A completed KPI became active again → re-open the goal
+      newGoalStatus = "В процесі";
+    } else if (newKpiStatus === "Завершено") {
+      // All KPIs completed → auto-complete the goal
+      const allDone =
+        updatedKpis.length > 0 && updatedKpis.every((k) => k.status === "Завершено");
+      if (allDone) newGoalStatus = "Завершено";
+    }
+
+    // Optimistic local update
+    updateLocalGoal(gid, (g) => ({
+      ...g,
+      status: newGoalStatus ?? g.status,
+      kpis: g.kpis.map((k) => (k.id === kid ? { ...k, status: newKpiStatus } : k)),
+    }));
+
+    // Persist KPI status
+    await supabase.from("goal_kpis").update({ status: newKpiStatus }).eq("id", kid);
+
+    // Persist goal status if it changed
+    if (newGoalStatus) {
+      await supabase.from("goals").update({ status: newGoalStatus }).eq("id", gid);
+    }
   };
 
   const changeGoalDates = async (
@@ -835,6 +903,7 @@ export function useProject(activeProjectId: string) {
     addKPI,
     removeKPI,
     updateKPI,
+    updateKPIStatus,
     addLink,
     removeLink,
     updateLink,

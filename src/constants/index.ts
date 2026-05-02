@@ -54,6 +54,8 @@ export const STAT = [
   "Заблоковано",
 ] as const;
 
+export const KPI_STAT = ["В процесі", "Завершено"] as const;
+
 export const ROLES = ["SMM", "SEO", "Media Buyer", "Команда"] as const;
 
 export const TASK_ROLES = ["SMM", "SEO", "Media Buyer"] as const;

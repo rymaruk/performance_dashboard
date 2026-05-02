@@ -57,6 +57,10 @@ export interface KpiDefinition {
   created_at: string;
 }
 
+/* ── KPI statuses ── */
+
+export type KpiStatus = "В процесі" | "Завершено";
+
 /* ── KPI (goal ↔ kpi_definition junction, with runtime name/unit) ── */
 
 export interface KPI {
@@ -68,6 +72,7 @@ export interface KPI {
   target: number;
   unit: string;
   color: string | null;
+  status: KpiStatus;
 }
 
 /* ── DB row shape for goal_kpis junction ── */
@@ -78,6 +83,7 @@ export interface GoalKpiRow {
   current_value: number;
   target_value: number;
   color: string | null;
+  status: string;
   created_at: string;
   kpi_definition?: KpiDefinition;
 }

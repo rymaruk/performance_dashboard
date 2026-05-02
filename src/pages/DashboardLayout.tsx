@@ -71,6 +71,7 @@ export function DashboardLayout() {
     addKPI,
     removeKPI,
     updateKPI,
+    updateKPIStatus,
     addLink,
     removeLink,
     updateLink,
@@ -181,6 +182,7 @@ export function DashboardLayout() {
               onAddKPI={addKPI}
               onRemoveKPI={removeKPI}
               onUpdateKPI={updateKPI}
+              onUpdateKPIStatus={updateKPIStatus}
               onAddTask={addTask}
               onRemoveTask={removeTask}
               onUpdateTask={updateTask}
@@ -193,7 +195,13 @@ export function DashboardLayout() {
           )}
 
           {tab === "kpi" && (
-            <KPIPanel proj={proj} teams={teams} onUpdateKPI={updateKPI} kpiLastChanges={kpiLastChanges} />
+            <KPIPanel
+              proj={proj}
+              teams={teams}
+              onUpdateKPI={updateKPI}
+              onUpdateKPIStatus={updateKPIStatus}
+              kpiLastChanges={kpiLastChanges}
+            />
           )}
 
           {tab === "gantt" && (

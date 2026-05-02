@@ -25,8 +25,21 @@ import { getAccentDef } from "../../constants";
 import { KpiEditDialog } from "../kpi/KpiEditDialog";
 import { KpiHistoryDialog } from "../kpi/KpiHistoryDialog";
 import { KpiLastChange } from "../kpi/KpiLastChange";
-import { X, BarChart3, Plus, TrendingUp, TrendingDown } from "lucide-react";
-import type { KPI, KpiDefinition, KpiValueHistory } from "../../types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import { X, BarChart3, Plus, TrendingUp, TrendingDown, CircleDot, ChevronDown } from "lucide-react";
+import { KPI_STAT } from "../../constants";
+import type { KPI, KpiDefinition, KpiValueHistory, KpiStatus } from "../../types";
+
+const KPI_STATUS_STYLES: Record<KpiStatus, string> = {
+  "В процесі": "bg-sky-500/10 text-sky-600",
+  "Завершено": "bg-success/10 text-success",
+};
 
 interface KPITableProps {
   goalId: string;
@@ -38,6 +51,7 @@ interface KPITableProps {
   onAdd: (kpiDefId: string) => void;
   onRemove: (kid: string) => void;
   onUpdate: (kid: string, fn: (k: KPI) => KPI, comment?: string) => void;
+  onUpdateStatus: (kid: string, status: KpiStatus) => void;
   kpiLastChanges?: Record<string, KpiValueHistory>;
 }
 
@@ -49,6 +63,7 @@ export function KPITable({
   onAdd,
   onRemove,
   onUpdate,
+  onUpdateStatus,
   kpiLastChanges,
 }: KPITableProps) {
   const confirm = useConfirmAction();
@@ -212,6 +227,46 @@ export function KPITable({
                     ? <TrendingUp className="size-3.5 shrink-0" />
                     : <TrendingDown className="size-3.5 shrink-0" />}
                 </span>
+              </div>
+
+              {/* KPI Status */}
+              <div className="flex items-center">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                        "cursor-pointer outline-none transition-colors hover:opacity-80",
+                        "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                        KPI_STATUS_STYLES[k.status ?? "В процесі"],
+                      )}
+                    >
+                      <CircleDot className="size-2.5" />
+                      {k.status ?? "В процесі"}
+                      <ChevronDown className="size-2.5 opacity-50" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="min-w-[140px]">
+                    <DropdownMenuGroup>
+                      {KPI_STAT.map((s) => (
+                        <DropdownMenuItem
+                          key={s}
+                          className={cn(k.status === s && "bg-accent font-semibold")}
+                          onSelect={() => onUpdateStatus(k.id, s)}
+                        >
+                          <span
+                            className={cn(
+                              "size-2 rounded-full shrink-0",
+                              s === "Завершено" ? "bg-success" : "bg-sky-500",
+                            )}
+                          />
+                          {s}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <KpiLastChange goalKpiId={k.id} optimistic={kpiLastChanges?.[k.id]} />

@@ -29,24 +29,39 @@ import {
 import { goalPeriodOverlapsFilter, medDate, today, addDays } from "../../utils/date";
 import { fmtNum } from "../../utils/format";
 import { getAccentDef } from "../../constants";
-import { BarChart3, FilterX, TrendingDown, TrendingUp, X } from "lucide-react";
-import type { Goal, KPI, KpiValueHistory, Project, Team } from "../../types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import { BarChart3, ChevronDown, CircleDot, FilterX, TrendingDown, TrendingUp, X } from "lucide-react";
+import { KPI_STAT } from "../../constants";
+import type { Goal, KPI, KpiStatus, KpiValueHistory, Project, Team } from "../../types";
+
+const KPI_STATUS_STYLES: Record<KpiStatus, string> = {
+  "В процесі": "bg-sky-500/10 text-sky-600",
+  "Завершено": "bg-success/10 text-success",
+};
 
 interface KPIPanelProps {
   proj: Project;
   teams: Team[];
   onUpdateKPI: (gid: string, kid: string, fn: (k: KPI) => KPI, comment?: string) => void;
+  onUpdateKPIStatus: (gid: string, kid: string, status: KpiStatus) => void;
   kpiLastChanges?: Record<string, KpiValueHistory>;
 }
 
 const kpiCardToneClass =
   "*:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs dark:*:data-[slot=card]:bg-card";
 
-export function KPIPanel({ proj, teams, onUpdateKPI, kpiLastChanges }: KPIPanelProps) {
+export function KPIPanel({ proj, teams, onUpdateKPI, onUpdateKPIStatus, kpiLastChanges }: KPIPanelProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const filterTeam = searchParams.get("team");
   const filterPeriodFrom = searchParams.get("from");
   const filterPeriodTo = searchParams.get("to");
+  const filterKpiStatus = searchParams.get("kpiStatus") as KpiStatus | null;
 
   const setFilter = useCallback(
     (key: string, value: string | null) => {
@@ -73,6 +88,7 @@ export function KPIPanel({ proj, teams, onUpdateKPI, kpiLastChanges }: KPIPanelP
     [setSearchParams],
   );
   const setFilterTeam = (v: string | null) => setFilter("team", v);
+  const setFilterKpiStatus = (v: string | null) => setFilter("kpiStatus", v);
 
   const teamName = (teamId: string | null | undefined) =>
     teams.find((t) => t.id === teamId)?.name ?? "Без команди";
@@ -91,18 +107,21 @@ export function KPIPanel({ proj, teams, onUpdateKPI, kpiLastChanges }: KPIPanelP
   );
 
   const filteredGoalsWithKpis = useMemo(() => {
-    return goalsWithKpis.filter((g: Goal) => {
-      if (teamFilterId && g.team_id !== teamFilterId) return false;
-      if (!goalPeriodOverlapsFilter(g.startDate, g.endDate, filterPeriodFrom, filterPeriodTo)) {
-        return false;
-      }
-      return true;
-    });
-  }, [goalsWithKpis, teamFilterId, filterPeriodFrom, filterPeriodTo]);
+    return goalsWithKpis
+      .filter((g: Goal) => {
+        if (teamFilterId && g.team_id !== teamFilterId) return false;
+        if (!goalPeriodOverlapsFilter(g.startDate, g.endDate, filterPeriodFrom, filterPeriodTo)) {
+          return false;
+        }
+        // When filtering by KPI status, hide goals where no KPI matches
+        if (filterKpiStatus && !g.kpis.some((k) => k.status === filterKpiStatus)) return false;
+        return true;
+      });
+  }, [goalsWithKpis, teamFilterId, filterPeriodFrom, filterPeriodTo, filterKpiStatus]);
 
   const hasAnyKpi = goalsWithKpis.length > 0;
   const severalGoals = filteredGoalsWithKpis.length > 1;
-  const hasFilters = Boolean(filterTeam || filterPeriodFrom || filterPeriodTo);
+  const hasFilters = Boolean(filterTeam || filterPeriodFrom || filterPeriodTo || filterKpiStatus);
   const noMatches = hasAnyKpi && filteredGoalsWithKpis.length === 0 && hasFilters;
 
   return (
@@ -125,6 +144,12 @@ export function KPIPanel({ proj, teams, onUpdateKPI, kpiLastChanges }: KPIPanelP
                 const sep = opt.indexOf("::");
                 return sep >= 0 ? opt.slice(0, sep) : opt;
               }}
+            />
+            <FilterSelect
+              label="Статус KPI"
+              value={filterKpiStatus}
+              options={[...KPI_STAT]}
+              onChange={setFilterKpiStatus}
             />
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <Label className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap">
@@ -233,20 +258,59 @@ export function KPIPanel({ proj, teams, onUpdateKPI, kpiLastChanges }: KPIPanelP
                       const onTrack = pct >= 50;
                       const TrendIcon = onTrack ? TrendingUp : TrendingDown;
 
+                      // When KPI status filter active, skip KPIs that don't match
+                      if (filterKpiStatus && k.status !== filterKpiStatus) return null;
+
                       return (
                         <Card
                           key={k.id}
                           className="@container/card min-w-0 w-full border-border/80 shadow-sm"
                         >
                           <CardHeader className="gap-2">
-                            <div className="flex flex-col">
-
-                            <CardDescription>{k.name}</CardDescription>
-                            <div className="text-muted-foreground mb-2">
-                              Ціль: {fmtNum(k.target)} {k.unit}
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <CardDescription className="truncate">{k.name}</CardDescription>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className={cn(
+                                        "shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                                        "cursor-pointer outline-none transition-colors hover:opacity-80",
+                                        "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                                        KPI_STATUS_STYLES[k.status ?? "В процесі"],
+                                      )}
+                                    >
+                                      <CircleDot className="size-2.5" />
+                                      {k.status ?? "В процесі"}
+                                      <ChevronDown className="size-2.5 opacity-50" />
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="min-w-[140px]">
+                                    <DropdownMenuGroup>
+                                      {KPI_STAT.map((s) => (
+                                        <DropdownMenuItem
+                                          key={s}
+                                          className={cn(k.status === s && "bg-accent font-semibold")}
+                                          onSelect={() => onUpdateKPIStatus(g.id, k.id, s)}
+                                        >
+                                          <span
+                                            className={cn(
+                                              "size-2 rounded-full shrink-0",
+                                              s === "Завершено" ? "bg-success" : "bg-sky-500",
+                                            )}
+                                          />
+                                          {s}
+                                        </DropdownMenuItem>
+                                      ))}
+                                    </DropdownMenuGroup>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                              <div className="text-muted-foreground text-xs">
+                                Ціль: {fmtNum(k.target)} {k.unit}
+                              </div>
                             </div>
-                            </div>
-                            
                           </CardHeader>
                           <CardContent className="pt-0 mb-0">
                             <CardTitle
@@ -299,7 +363,6 @@ export function KPIPanel({ proj, teams, onUpdateKPI, kpiLastChanges }: KPIPanelP
                             </div>
                           </CardContent>
                           <CardFooter className="flex flex-col items-start gap-2 text-sm">
-                            
                             <KpiLastChange goalKpiId={k.id} optimistic={kpiLastChanges?.[k.id]} />
                             <KpiHistoryDialog kpi={k} />
                           </CardFooter>

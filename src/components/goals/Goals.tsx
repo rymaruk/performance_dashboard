@@ -18,7 +18,7 @@ import { goalPeriodOverlapsFilter, today, addDays } from "../../utils/date";
 import { DateRangePicker } from "../ui/DateRangePicker";
 import { Label } from "../ui/label";
 import { AlertTriangle, FilterX, Plus, X, Target } from "lucide-react";
-import type { Goal, KPI, KpiDefinition, KpiValueHistory, Task, Project, Team, UserProfile } from "../../types";
+import type { Goal, KPI, KpiDefinition, KpiValueHistory, KpiStatus, Task, Project, Team, UserProfile } from "../../types";
 
 interface GoalsProps {
   proj: Project;
@@ -36,6 +36,7 @@ interface GoalsProps {
   onAddKPI: (gid: string, kpiDefId: string) => void;
   onRemoveKPI: (gid: string, kid: string) => void;
   onUpdateKPI: (gid: string, kid: string, fn: (k: KPI) => KPI, comment?: string) => void;
+  onUpdateKPIStatus: (gid: string, kid: string, status: KpiStatus) => void;
   onAddTask: (gid: string) => void;
   onRemoveTask: (gid: string, tid: string) => void;
   onUpdateTask: (gid: string, tid: string, fn: (t: Task) => Task) => void;
@@ -62,6 +63,7 @@ export function Goals({
   onAddKPI,
   onRemoveKPI,
   onUpdateKPI,
+  onUpdateKPIStatus,
   onAddTask,
   onRemoveTask,
   onUpdateTask,
@@ -362,6 +364,7 @@ export function Goals({
               onAddKPI={(kpiDefId) => onAddKPI(g.id, kpiDefId)}
               onRemoveKPI={(kid) => onRemoveKPI(g.id, kid)}
               onUpdateKPI={(kid, fn, comment) => onUpdateKPI(g.id, kid, fn, comment)}
+              onUpdateKPIStatus={(kid, status) => onUpdateKPIStatus(g.id, kid, status)}
               onAddTask={() => onAddTask(g.id)}
               onRemoveTask={(tid) => onRemoveTask(g.id, tid)}
               onUpdateTask={(tid, fn) => onUpdateTask(g.id, tid, fn)}
