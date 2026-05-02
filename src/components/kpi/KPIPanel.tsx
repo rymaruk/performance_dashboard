@@ -28,7 +28,7 @@ import {
 } from "../ui/empty";
 import { goalPeriodOverlapsFilter, medDate, today, addDays } from "../../utils/date";
 import { fmtNum } from "../../utils/format";
-import { getAccentDef } from "../../constants";
+import { getAccentDef, PRIO } from "../../constants";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +43,20 @@ import type { Goal, KPI, KpiStatus, KpiValueHistory, Project, Team } from "../..
 const KPI_STATUS_STYLES: Record<KpiStatus, string> = {
   "В процесі": "bg-sky-500/10 text-sky-600",
   "Завершено": "bg-success/10 text-success",
+};
+
+const PRIORITY_ORDER: Record<string, number> = {
+  "🔴 Критичний": 1,
+  "🟠 Високий": 2,
+  "🟡 Середній": 3,
+  "🟢 Низький": 4,
+};
+
+const PRIO_BADGE_STYLES: Record<string, string> = {
+  "🔴 Критичний": "bg-rose-500/10 text-rose-600",
+  "🟠 Високий": "bg-orange-500/10 text-orange-600",
+  "🟡 Середній": "bg-amber-500/10 text-amber-600",
+  "🟢 Низький": "bg-emerald-500/10 text-emerald-600",
 };
 
 interface KPIPanelProps {
@@ -61,7 +75,14 @@ export function KPIPanel({ proj, teams, onUpdateKPI, onUpdateKPIStatus, kpiLastC
   const filterTeam = searchParams.get("team");
   const filterPeriodFrom = searchParams.get("from");
   const filterPeriodTo = searchParams.get("to");
-  const filterKpiStatus = searchParams.get("kpiStatus") as KpiStatus | null;
+  const filterPriority = searchParams.get("prio");
+
+  // null in URL → default "В процесі"; "all" in URL → show all (no status filter)
+  const rawKpiStatus = searchParams.get("kpiStatus");
+  const filterKpiStatusValue = rawKpiStatus ?? "В процесі"; // effective display/filter value
+  const activeKpiStatusFilter = filterKpiStatusValue === "all" ? null : filterKpiStatusValue as KpiStatus;
+  // Value passed to FilterSelect: "all" maps to null so it shows "Усі"
+  const kpiStatusSelectValue = filterKpiStatusValue === "all" ? null : filterKpiStatusValue;
 
   const setFilter = useCallback(
     (key: string, value: string | null) => {
@@ -88,7 +109,9 @@ export function KPIPanel({ proj, teams, onUpdateKPI, onUpdateKPIStatus, kpiLastC
     [setSearchParams],
   );
   const setFilterTeam = (v: string | null) => setFilter("team", v);
-  const setFilterKpiStatus = (v: string | null) => setFilter("kpiStatus", v);
+  const setFilterPriority = (v: string | null) => setFilter("prio", v);
+  // When FilterSelect sends null (user chose "Усі"), store "all" so it's distinguishable from the "В процесі" default
+  const setFilterKpiStatus = (v: string | null) => setFilter("kpiStatus", v ?? "all");
 
   const teamName = (teamId: string | null | undefined) =>
     teams.find((t) => t.id === teamId)?.name ?? "Без команди";
@@ -110,18 +133,30 @@ export function KPIPanel({ proj, teams, onUpdateKPI, onUpdateKPIStatus, kpiLastC
     return goalsWithKpis
       .filter((g: Goal) => {
         if (teamFilterId && g.team_id !== teamFilterId) return false;
+        if (filterPriority && g.priority !== filterPriority) return false;
         if (!goalPeriodOverlapsFilter(g.startDate, g.endDate, filterPeriodFrom, filterPeriodTo)) {
           return false;
         }
-        // When filtering by KPI status, hide goals where no KPI matches
-        if (filterKpiStatus && !g.kpis.some((k) => k.status === filterKpiStatus)) return false;
+        // Hide goals where no KPI matches the active status filter (null = Усі = no filter)
+        if (activeKpiStatusFilter && !g.kpis.some((k) => k.status === activeKpiStatusFilter)) return false;
         return true;
-      });
-  }, [goalsWithKpis, teamFilterId, filterPeriodFrom, filterPeriodTo, filterKpiStatus]);
+      })
+      .sort(
+        (a, b) =>
+          (PRIORITY_ORDER[a.priority] ?? 99) - (PRIORITY_ORDER[b.priority] ?? 99),
+      );
+  }, [goalsWithKpis, teamFilterId, filterPriority, filterPeriodFrom, filterPeriodTo, activeKpiStatusFilter]);
 
   const hasAnyKpi = goalsWithKpis.length > 0;
   const severalGoals = filteredGoalsWithKpis.length > 1;
-  const hasFilters = Boolean(filterTeam || filterPeriodFrom || filterPeriodTo || filterKpiStatus);
+  // rawKpiStatus !== null means user explicitly changed the status filter (default is unset = "В процесі")
+  const hasFilters = Boolean(
+    filterTeam ||
+    filterPriority ||
+    filterPeriodFrom ||
+    filterPeriodTo ||
+    rawKpiStatus !== null,
+  );
   const noMatches = hasAnyKpi && filteredGoalsWithKpis.length === 0 && hasFilters;
 
   return (
@@ -146,8 +181,14 @@ export function KPIPanel({ proj, teams, onUpdateKPI, onUpdateKPIStatus, kpiLastC
               }}
             />
             <FilterSelect
+              label="Пріоритет цілі"
+              value={filterPriority}
+              options={[...PRIO]}
+              onChange={setFilterPriority}
+            />
+            <FilterSelect
               label="Статус KPI"
-              value={filterKpiStatus}
+              value={kpiStatusSelectValue}
               options={[...KPI_STAT]}
               onChange={setFilterKpiStatus}
             />
@@ -228,17 +269,27 @@ export function KPIPanel({ proj, teams, onUpdateKPI, onUpdateKPIStatus, kpiLastC
                 >
                   <div className="flex flex-col gap-1">
                     <div className="flex flex-wrap items-center gap-2 text-[13px] font-bold text-foreground">
-                      <span className={cn("inline-block size-2.5 rounded-full", gac.bg)} />
+                      <span className={cn("inline-block size-2.5 rounded-full shrink-0", gac.bg)} />
                       {g.title}
                     </div>
-                    <span className="flex flex-wrap items-center gap-2 text-[10px] font-normal text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
+                      <span
+                        className={cn(
+                          "rounded-full px-1.5 py-0.5 font-bold",
+                          PRIO_BADGE_STYLES[g.priority] ?? "bg-muted text-muted-foreground",
+                        )}
+                      >
+                        {g.priority}
+                      </span>
+                      <span className="text-muted-foreground/40">|</span>
                       <Badge variant="secondary" className={cn("text-[10px]", gac.text)}>
                         {teamName(g.team_id)}
                       </Badge>
+                      <span className="text-muted-foreground/40">|</span>
                       <span className="tabular-nums">
                         ({medDate(g.startDate)}–{medDate(g.endDate)})
                       </span>
-                    </span>
+                    </div>
                   </div>
 
                   <div
@@ -259,7 +310,7 @@ export function KPIPanel({ proj, teams, onUpdateKPI, onUpdateKPIStatus, kpiLastC
                       const TrendIcon = onTrack ? TrendingUp : TrendingDown;
 
                       // When KPI status filter active, skip KPIs that don't match
-                      if (filterKpiStatus && k.status !== filterKpiStatus) return null;
+                      if (activeKpiStatusFilter && k.status !== activeKpiStatusFilter) return null;
 
                       return (
                         <Card
