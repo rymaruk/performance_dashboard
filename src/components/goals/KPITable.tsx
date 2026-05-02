@@ -32,7 +32,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { X, BarChart3, Plus, TrendingUp, TrendingDown, CircleDot, ChevronDown } from "lucide-react";
+import { X, BarChart3, Plus, TrendingUp, TrendingDown, CircleDot, ChevronDown, CheckCircle2 } from "lucide-react";
 import { KPI_STAT } from "../../constants";
 import type { KPI, KpiDefinition, KpiValueHistory, KpiStatus } from "../../types";
 
@@ -161,7 +161,12 @@ export function KPITable({
             <div key={k.id} className="rounded-lg border border-border/80 p-3 min-w-0 flex flex-col gap-2">
               {/* Header: name + delete */}
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] text-muted-foreground truncate">{k.name}</span>
+                <span className="text-[11px] text-muted-foreground truncate flex items-center gap-1">
+                  {k.status === "Завершено" && (
+                    <CheckCircle2 className="size-3 shrink-0 text-success" />
+                  )}
+                  {k.name}
+                </span>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -192,16 +197,18 @@ export function KPITable({
                 >
                   {fmtNum(k.current)}
                 </span>
-                <KpiEditDialog
-                  kpi={k}
-                  onSave={(newVal, comment, newTarget) =>
-                    onUpdate(
-                      k.id,
-                      (kk) => ({ ...kk, current: newVal, ...(newTarget !== undefined ? { target: newTarget } : {}) }),
-                      comment,
-                    )
-                  }
-                />
+                {k.status !== "Завершено" && (
+                  <KpiEditDialog
+                    kpi={k}
+                    onSave={(newVal, comment, newTarget) =>
+                      onUpdate(
+                        k.id,
+                        (kk) => ({ ...kk, current: newVal, ...(newTarget !== undefined ? { target: newTarget } : {}) }),
+                        comment,
+                      )
+                    }
+                  />
+                )}
                 <span className="ml-auto text-[11px] font-medium text-muted-foreground">{pct}%</span>
               </div>
 

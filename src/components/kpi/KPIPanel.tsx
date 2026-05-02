@@ -36,7 +36,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { BarChart3, ChevronDown, CircleDot, FilterX, TrendingDown, TrendingUp, X } from "lucide-react";
+import { BarChart3, CheckCircle2, ChevronDown, CircleDot, FilterX, TrendingDown, TrendingUp, X } from "lucide-react";
 import { KPI_STAT } from "../../constants";
 import type { Goal, KPI, KpiStatus, KpiValueHistory, Project, Team } from "../../types";
 
@@ -269,7 +269,12 @@ export function KPIPanel({ proj, teams, onUpdateKPI, onUpdateKPIStatus, kpiLastC
                           <CardHeader className="gap-2">
                             <div className="flex flex-col gap-1">
                               <div className="flex items-center justify-between gap-2">
-                                <CardDescription className="truncate">{k.name}</CardDescription>
+                                <CardDescription className="truncate flex items-center gap-1">
+                                  {k.status === "Завершено" && (
+                                    <CheckCircle2 className="size-3 shrink-0 text-success" />
+                                  )}
+                                  {k.name}
+                                </CardDescription>
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <button
@@ -307,7 +312,7 @@ export function KPIPanel({ proj, teams, onUpdateKPI, onUpdateKPIStatus, kpiLastC
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               </div>
-                              <div className="text-muted-foreground text-xs">
+                              <div className={cn("text-xs font-semibold", pct >= 100 ? "text-success" : kac.text)}>
                                 Ціль: {fmtNum(k.target)} {k.unit}
                               </div>
                             </div>
@@ -320,17 +325,19 @@ export function KPIPanel({ proj, teams, onUpdateKPI, onUpdateKPIStatus, kpiLastC
                               )}
                             >
                               <span>{fmtNum(k.current)}</span>
-                              <KpiEditDialog
-                                kpi={k}
-                                onSave={(newVal, comment, newTarget) =>
-                                  onUpdateKPI(
-                                    g.id,
-                                    k.id,
-                                    (kk) => ({ ...kk, current: newVal, ...(newTarget !== undefined ? { target: newTarget } : {}) }),
-                                    comment,
-                                  )
-                                }
-                              />
+                              {k.status !== "Завершено" && (
+                                <KpiEditDialog
+                                  kpi={k}
+                                  onSave={(newVal, comment, newTarget) =>
+                                    onUpdateKPI(
+                                      g.id,
+                                      k.id,
+                                      (kk) => ({ ...kk, current: newVal, ...(newTarget !== undefined ? { target: newTarget } : {}) }),
+                                      comment,
+                                    )
+                                  }
+                                />
+                              )}
                             </CardTitle>
                             <div className="flex items-center gap-2">
                               <div className="flex-1 min-w-0">
@@ -350,17 +357,19 @@ export function KPIPanel({ proj, teams, onUpdateKPI, onUpdateKPIStatus, kpiLastC
                                 {pct}%
                               </Badge>
                             </div>
-                            <div className="flex items-center justify-between gap-2 w-full">
-                              <KpiDiffBadge goalKpiId={k.id} optimistic={kpiLastChanges?.[k.id]} />
-                              <div className="line-clamp-1 flex items-center gap-2 font-medium text-xs">
-                                {pct >= 100
-                                  ? "Ціль досягнуто"
-                                  : onTrack
-                                    ? "Прогрес у нормі"
-                                    : "Потрібне прискорення"}
-                                <TrendIcon className="size-4 shrink-0" />
+                            {k.status !== "Завершено" && (
+                              <div className="flex items-center justify-between gap-2 w-full">
+                                <KpiDiffBadge goalKpiId={k.id} optimistic={kpiLastChanges?.[k.id]} />
+                                <div className="line-clamp-1 flex items-center gap-2 font-medium text-xs">
+                                  {pct >= 100
+                                    ? "Ціль досягнуто"
+                                    : onTrack
+                                      ? "Прогрес у нормі"
+                                      : "Потрібне прискорення"}
+                                  <TrendIcon className="size-4 shrink-0" />
+                                </div>
                               </div>
-                            </div>
+                            )}
                           </CardContent>
                           <CardFooter className="flex flex-col items-start gap-2 text-sm">
                             <KpiLastChange goalKpiId={k.id} optimistic={kpiLastChanges?.[k.id]} />
