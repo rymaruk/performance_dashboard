@@ -458,6 +458,7 @@ export function KpiManagePage() {
                                             target: g.target_value,
                                             unit: kpi.unit,
                                             color: kpi.color ?? null,
+                                            status: "В процесі",
                                           }}
                                         />
                                       </TableCell>

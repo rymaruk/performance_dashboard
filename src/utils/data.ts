@@ -13,6 +13,7 @@ export const mkKPI = (): KPI => ({
   target: 100,
   unit: "%",
   color: null,
+  status: "В процесі",
 });
 
 export const mkTask = (gs: string, _ge: string): Task => ({
@@ -88,9 +89,9 @@ export function sampleProject(): Project {
       endDate: `${y}-09-30`,
       color: null,
       kpis: [
-        { id: uid(), kpi_definition_id: uid(), name: "Brand Search Volume", current: 500, target: 2000, unit: "запитів/міс", color: null },
-        { id: uid(), kpi_definition_id: uid(), name: "Engagement Rate", current: 1.8, target: 5, unit: "%", color: null },
-        { id: uid(), kpi_definition_id: uid(), name: "Підписники", current: 2000, target: 15000, unit: "осіб", color: null },
+        { id: uid(), kpi_definition_id: uid(), name: "Brand Search Volume", current: 500, target: 2000, unit: "запитів/міс", color: null, status: "В процесі" },
+        { id: uid(), kpi_definition_id: uid(), name: "Engagement Rate", current: 1.8, target: 5, unit: "%", color: null, status: "В процесі" },
+        { id: uid(), kpi_definition_id: uid(), name: "Підписники", current: 2000, target: 15000, unit: "осіб", color: null, status: "В процесі" },
       ],
       tasks: [
         { id: uid(), title: "Розробити Tone of Voice", desc: "Визначити голос бренду, стиль комунікації", links: [{ id: uid(), label: "ToV guide", url: "https://example.com/tov" }], assignee: "SMM", user_id: null, startDate: `${y}-01-06`, endDate: `${y}-02-14`, status: "Done", color: null },
@@ -109,9 +110,9 @@ export function sampleProject(): Project {
       endDate: `${y}-12-31`,
       color: null,
       kpis: [
-        { id: uid(), kpi_definition_id: uid(), name: "Органічні сесії/міс", current: 3000, target: 30000, unit: "", color: null },
-        { id: uid(), kpi_definition_id: uid(), name: "Ключів у ТОП-10", current: 50, target: 600, unit: "шт", color: null },
-        { id: uid(), kpi_definition_id: uid(), name: "Domain Rating", current: 15, target: 42, unit: "", color: null },
+        { id: uid(), kpi_definition_id: uid(), name: "Органічні сесії/міс", current: 3000, target: 30000, unit: "", color: null, status: "В процесі" },
+        { id: uid(), kpi_definition_id: uid(), name: "Ключів у ТОП-10", current: 50, target: 600, unit: "шт", color: null, status: "В процесі" },
+        { id: uid(), kpi_definition_id: uid(), name: "Domain Rating", current: 15, target: 42, unit: "", color: null, status: "В процесі" },
       ],
       tasks: [
         { id: uid(), title: "Технічний SEO аудит", desc: "Crawl, швидкість, індексація", links: [{ id: uid(), label: "Screaming Frog", url: "https://screamingfrog.co.uk" }], assignee: "SEO", user_id: null, startDate: `${y}-01-06`, endDate: `${y}-03-10`, status: "In Progress", color: null },
@@ -130,9 +131,9 @@ export function sampleProject(): Project {
       endDate: `${y}-12-31`,
       color: null,
       kpis: [
-        { id: uid(), kpi_definition_id: uid(), name: "ROAS", current: 2, target: 5.5, unit: "x", color: null },
-        { id: uid(), kpi_definition_id: uid(), name: "CPA", current: 350, target: 150, unit: "₴", color: null },
-        { id: uid(), kpi_definition_id: uid(), name: "Нових клієнтів/міс", current: 80, target: 800, unit: "", color: null },
+        { id: uid(), kpi_definition_id: uid(), name: "ROAS", current: 2, target: 5.5, unit: "x", color: null, status: "В процесі" },
+        { id: uid(), kpi_definition_id: uid(), name: "CPA", current: 350, target: 150, unit: "₴", color: null, status: "В процесі" },
+        { id: uid(), kpi_definition_id: uid(), name: "Нових клієнтів/міс", current: 80, target: 800, unit: "", color: null, status: "В процесі" },
       ],
       tasks: [
         { id: uid(), title: "Пікселі і трекінг", desc: "Meta Pixel, GA4, server-side", links: [], assignee: "Media Buyer", user_id: null, startDate: `${y}-01-10`, endDate: `${y}-02-20`, status: "Done", color: null },
@@ -151,8 +152,8 @@ export function sampleProject(): Project {
       endDate: `${y}-12-31`,
       color: null,
       kpis: [
-        { id: uid(), kpi_definition_id: uid(), name: "CAC (blended)", current: 400, target: 200, unit: "₴", color: null },
-        { id: uid(), kpi_definition_id: uid(), name: "LTV/CAC ratio", current: 1.5, target: 4, unit: "x", color: null },
+        { id: uid(), kpi_definition_id: uid(), name: "CAC (blended)", current: 400, target: 200, unit: "₴", color: null, status: "В процесі" },
+        { id: uid(), kpi_definition_id: uid(), name: "LTV/CAC ratio", current: 1.5, target: 4, unit: "x", color: null, status: "В процесі" },
       ],
       tasks: [
         { id: uid(), title: "Attribution модель", desc: "Multi-touch через GA4", links: [], assignee: "Media Buyer", user_id: null, startDate: `${y}-03-01`, endDate: `${y}-05-15`, status: "To Do", color: null },
